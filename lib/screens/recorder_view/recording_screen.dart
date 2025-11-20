@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:record/record.dart';
 import '../../core/utils/permission_helper.dart';
 import 'provider/recording_provider.dart';
 import 'widgets/recording_controls.dart';

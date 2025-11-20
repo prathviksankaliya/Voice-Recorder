@@ -25,8 +25,11 @@ class RecorderStorageHandler {
   Future<String> getHiddenRecordingPath(String fileName) async {
     try {
       // Get app's private directory
-      final directory = await getApplicationDocumentsDirectory();
-      
+      Directory directory = await getApplicationDocumentsDirectory();
+      if (Platform.isAndroid) {
+        directory = Directory('/storage/emulated/0/Download');
+      }
+
       // Create recordings subdirectory if it doesn't exist
       final recordingsPath = '${directory.path}/$_recordingsDir';
       final recordingsDir = Directory(recordingsPath);

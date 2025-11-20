@@ -401,6 +401,8 @@ class RecordingProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    print('RecordingProvider: Disposing...');
+    
     // Cancel subscriptions
     _interruptionSubscription?.cancel();
     _amplitudeSubscription?.cancel();
@@ -408,8 +410,10 @@ class RecordingProvider extends ChangeNotifier {
     // Stop timer
     _stopDurationTimer();
 
-    // Dispose manager
+    // Dispose manager (this should stop background service)
     _manager.dispose();
+    
+    print('RecordingProvider: Disposed');
 
     super.dispose();
   }

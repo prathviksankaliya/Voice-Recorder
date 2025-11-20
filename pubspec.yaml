@@ -37,7 +37,6 @@ dependencies:
   record: ^6.1.2
   audio_session: ^0.2.2
   permission_handler: ^12.0.1
-  flutter_background: ^1.3.0+1
   path_provider: ^2.1.5
   provider: ^6.1.5+1
 

@@ -4,18 +4,18 @@ import '../../core/enums/enums.dart';
 import '../../core/models/interruption_data.dart';
 
 /// Manages audio session configuration and interruption detection
-/// 
+///
 /// This singleton service:
 /// - Configures audio session for recording
 /// - Detects various types of audio interruptions (calls, headphone disconnect, etc.)
 /// - Emits interruption events through a stream
 /// - Handles audio focus and routing
-/// 
+///
 /// Use [AudioSessionService.instance] to access the singleton.
 class AudioSessionService {
   /// Singleton instance
   static final AudioSessionService instance = AudioSessionService._internal();
-  
+
   /// Private constructor for singleton
   AudioSessionService._internal();
 
@@ -35,7 +35,7 @@ class AudioSessionService {
       StreamController<InterruptionData>.broadcast();
 
   /// Stream of interruption events
-  /// 
+  ///
   /// Subscribe to this stream to receive notifications about audio interruptions
   /// like phone calls, headphone disconnections, etc.
   Stream<InterruptionData> get interruptionEvents => _interruptionController.stream;
@@ -47,10 +47,10 @@ class AudioSessionService {
   AudioSession? get audioSession => _audioSession;
 
   /// Initializes the audio session service
-  /// 
+  ///
   /// Sets up the audio session and starts listening for interruptions.
   /// Should be called once when the app starts or before recording.
-  /// 
+  ///
   /// Returns true if initialization was successful.
   Future<bool> initialize() async {
     try {
@@ -75,12 +75,12 @@ class AudioSessionService {
   }
 
   /// Configures the audio session for recording
-  /// 
+  ///
   /// Sets up optimal audio configuration for recording:
   /// - Enables recording mode
   /// - Configures for voice/music recording
   /// - Handles interruptions appropriately
-  /// 
+  ///
   /// Returns true if configuration was successful.
   Future<bool> configureForRecording() async {
     try {
@@ -96,22 +96,20 @@ class AudioSessionService {
       }
 
       // Configure for recording
-      await session.configure(
-        const AudioSessionConfiguration(
-          avAudioSessionCategory: AVAudioSessionCategory.playAndRecord,
-          avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.allowBluetooth,
-          avAudioSessionMode: AVAudioSessionMode.spokenAudio,
-          avAudioSessionRouteSharingPolicy: AVAudioSessionRouteSharingPolicy.defaultPolicy,
-          avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
-          androidAudioAttributes: AndroidAudioAttributes(
-            contentType: AndroidAudioContentType.speech,
-            flags: AndroidAudioFlags.audibilityEnforced,
-            usage: AndroidAudioUsage.voiceCommunication,
-          ),
-          androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
-          androidWillPauseWhenDucked: false,
+      await session.configure(AudioSessionConfiguration(
+        avAudioSessionCategory: AVAudioSessionCategory.record,
+        avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.allowBluetooth,
+        avAudioSessionMode: AVAudioSessionMode.spokenAudio,
+        avAudioSessionRouteSharingPolicy: AVAudioSessionRouteSharingPolicy.defaultPolicy,
+        avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
+        androidAudioAttributes: const AndroidAudioAttributes(
+          contentType: AndroidAudioContentType.speech,
+          flags: AndroidAudioFlags.none,
+          usage: AndroidAudioUsage.voiceCommunication,
         ),
-      );
+        androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
+        androidWillPauseWhenDucked: true,
+      ));
 
       // Activate the audio session
       await session.setActive(true);
@@ -121,24 +119,6 @@ class AudioSessionService {
     } catch (e) {
       print('AudioSessionService: Configuration error - $e');
       return false;
-    }
-  }
-
-  /// Configures the audio session for playback
-  /// 
-  /// Use this when switching from recording to playback mode.
-  Future<void> configureForPlayback() async {
-    try {
-      final session = _audioSession;
-      if (session == null) return;
-
-      await session.configure(
-        const AudioSessionConfiguration.music(),
-      );
-
-      print('AudioSessionService: Configured for playback');
-    } catch (e) {
-      print('AudioSessionService: Playback configuration error - $e');
     }
   }
 
@@ -166,18 +146,18 @@ class AudioSessionService {
   }
 
   /// Handles system-level audio interruptions
-  /// 
+  ///
   /// Examples: phone calls, VoIP calls, other media playback
   void _handleSystemInterruption(AudioInterruptionEvent event) {
     print('AudioSessionService: System interruption - ${event.type}');
 
     if (event.begin) {
       // Ignore unknown interruptions (false positives during recording setup)
-      if (event.type == AudioInterruptionType.unknown) {
-        print('AudioSessionService: Ignoring unknown interruption (likely false positive)');
-        return;
-      }
-      
+      // if (event.type == AudioInterruptionType.unknown) {
+      //   print('AudioSessionService: Ignoring unknown interruption (likely false positive)');
+      //   return;
+      // }
+
       // Interruption started
       final type = _mapInterruptionType(event.type);
       _emitInterruption(type, shouldPause: true);
@@ -188,7 +168,7 @@ class AudioSessionService {
   }
 
   /// Handles audio device changes
-  /// 
+  ///
   /// Examples: headphones plugged/unplugged, Bluetooth connected/disconnected
   void _handleDeviceChange(AudioDevicesChangedEvent event) {
     print('AudioSessionService: Devices changed');
@@ -196,7 +176,7 @@ class AudioSessionService {
     // Check for removed devices (disconnections)
     for (final device in event.devicesRemoved) {
       print('AudioSessionService: Device removed - ${device.name}');
-      
+
       final type = _identifyDeviceType(device);
       _emitInterruption(type, shouldPause: true);
     }
@@ -208,11 +188,11 @@ class AudioSessionService {
   }
 
   /// Handles "becoming noisy" events
-  /// 
+  ///
   /// This occurs when audio output suddenly changes (e.g., headphones unplugged)
   void _handleBecomingNoisy(void event) {
     print('AudioSessionService: Becoming noisy event');
-    
+
     _emitInterruption(
       InterruptionType.becomingNoisy,
       shouldPause: true,
@@ -234,7 +214,7 @@ class AudioSessionService {
   /// Identifies the type of audio device for interruption classification
   InterruptionType _identifyDeviceType(AudioDevice device) {
     final name = device.name.toLowerCase();
-    
+
     if (name.contains('bluetooth') || name.contains('bt')) {
       return InterruptionType.bluetoothDisconnect;
     } else if (name.contains('headphone') || name.contains('headset')) {
@@ -260,7 +240,7 @@ class AudioSessionService {
   }
 
   /// Resets the audio session
-  /// 
+  ///
   /// Deactivates the audio session. Call this after stopping recording.
   Future<void> reset() async {
     try {
@@ -275,14 +255,14 @@ class AudioSessionService {
   }
 
   /// Disposes the service and cleans up resources
-  /// 
+  ///
   /// Cancels all subscriptions and closes streams.
   void dispose() {
     _interruptionSubscription?.cancel();
     _devicesSubscription?.cancel();
     _becomingNoisySubscription?.cancel();
     _interruptionController.close();
-    
+
     _isInitialized = false;
     print('AudioSessionService: Disposed');
   }

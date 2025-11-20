@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
 
 /// Helper class for managing app permissions

@@ -3,15 +3,14 @@ import 'dart:io';
 import 'package:record/record.dart';
 import '../../../core/enums/enums.dart';
 import '../../../core/models/interruption_data.dart';
-import '../../../services/recording_services/recorder_service.dart';
 import '../../../services/recording_services/audio_session_service.dart';
-import '../../../services/recording_services/recording_background_service.dart';
+import '../../../services/recording_services/recorder_service.dart';
 import '../../../widgets/live_wave_form_widget/wave_data_manager.dart';
 
-/// Orchestrates all recording services and provides a unified API
+/// Orchestrates recording services and provides a unified API
 /// 
 /// This is the main coordinator that:
-/// - Manages all recording services (recorder, audio session, background, waveform)
+/// - Manages recording services (recorder, waveform)
 /// - Coordinates service interactions and lifecycle
 /// - Provides a simple API for the UI layer
 /// - Handles errors and cleanup
@@ -27,9 +26,6 @@ class RecorderManager {
   
   /// Waveform data management
   final WaveDataManager _waveManager;
-  
-  /// Background service management
-  final RecordingBackgroundService _backgroundService;
 
   /// Stream subscriptions
   StreamSubscription<Amplitude>? _amplitudeSubscription;
@@ -46,12 +42,9 @@ class RecorderManager {
     RecorderService? recorder,
     AudioSessionService? audioSessionService,
     WaveDataManager? waveManager,
-    RecordingBackgroundService? backgroundService,
   })  : _recorder = recorder ?? RecorderService(),
         _audioSessionService = audioSessionService ?? AudioSessionService.instance,
-        _waveManager = waveManager ?? WaveDataManager.instance,
-        _backgroundService = backgroundService ?? RecordingBackgroundService.instance;
-
+        _waveManager = waveManager ?? WaveDataManager.instance;
   /// Stream of interruption events for the UI
   /// 
   /// Subscribe to this to handle interruptions (phone calls, headphone disconnect, etc.)
@@ -59,6 +52,12 @@ class RecorderManager {
 
   /// Stream of amplitude data from the recorder
   Stream<Amplitude> get amplitudeStream => _recorder.amplitudeStream;
+  
+  /// Stream of interruption events from the recorder
+  /// 
+  /// Emits true when an interruption occurs (phone call, other app takes audio focus)
+  /// Emits false when recording resumes after interruption
+  Stream<RecordState> get onStateChanged => _recorder.onStateChanged;
 
   /// Current recording state
   RecordingState get recordingState => _recorder.state;
@@ -114,12 +113,6 @@ class RecorderManager {
         return false;
       }
 
-      // 4. Initialize background service
-      final backgroundInit = await _backgroundService.initialize();
-      if (!backgroundInit) {
-        print('RecorderManager: Background service initialization failed (continuing anyway)');
-      }
-
       // 5. Setup stream connections
       _setupStreamConnections();
 
@@ -159,38 +152,29 @@ class RecorderManager {
   /// 
   /// This will:
   /// 1. Configure audio session for recording
-  /// 2. Start background service (if needed)
-  /// 3. Start the recorder
-  /// 4. Start waveform data collection
+  /// 2. Start the recorder
+  /// 3. Start waveform data collection
   /// 
   /// Throws an exception if recording fails to start.
   Future<void> startRecording() async {
     try {
       print('RecorderManager: Starting recording...');
 
-      // 1. Configure audio session
+      // 1. Configure audio session FIRST (before starting recorder)
       final audioConfigured = await _audioSessionService.configureForRecording();
       if (!audioConfigured) {
         throw Exception('Failed to configure audio session');
       }
 
-      // 2. Start background service
-      final bgStarted = await _backgroundService.startService();
-      if (!bgStarted) {
-        print('RecorderManager: Background service failed (continuing anyway)');
-      }
-
-      // 3. Start recording
+      // 2. Start recording (after audio session is configured)
       await _recorder.startRecording();
 
-      // 4. Start wave data collection
+      // 3. Start wave data collection
       _waveManager.startRecording();
 
       print('RecorderManager: Recording started successfully');
     } catch (e) {
       print('RecorderManager: Start recording error - $e');
-      // Cleanup on error
-      await _backgroundService.stopService();
       rethrow;
     }
   }
@@ -232,15 +216,16 @@ class RecorderManager {
 
       print('RecorderManager: Resuming recording...');
 
-      // 1. Ensure background service is running
-      if (!await _backgroundService.checkIsRunning()) {
-        await _backgroundService.startService();
+      // 1. Configure audio session
+      final audioConfigured = await _audioSessionService.configureForRecording();
+      if (!audioConfigured) {
+        throw Exception('Failed to configure audio session');
       }
 
-      // 2. Resume recorder
+      // 1. Resume recorder
       await _recorder.resumeRecording();
 
-      // 3. Resume wave data collection
+      // 2. Resume wave data collection
       _waveManager.resumeRecording();
 
       print('RecorderManager: Recording resumed');
@@ -260,15 +245,17 @@ class RecorderManager {
 
       // 1. Stop recorder
       final file = await _recorder.stopRecording();
+      
+      // 2. Stop wave data collection (do this regardless of file status)
+      _waveManager.stopRecording();
+
+      // 3. Check file validity after cleanup is done
       if (file == null || !file.existsSync()) {
         throw Exception('Recording file not found');
       }
 
       // 2. Stop wave data collection
       _waveManager.stopRecording();
-
-      // 3. Stop background service
-      await _backgroundService.stopService();
 
       // 4. Reset audio session
       await _audioSessionService.reset();
@@ -279,8 +266,6 @@ class RecorderManager {
       return (file, timestamp);
     } catch (e) {
       print('RecorderManager: Stop recording error - $e');
-      // Ensure background service is stopped even on error
-      await _backgroundService.stopService();
       rethrow;
     }
   }
@@ -297,11 +282,6 @@ class RecorderManager {
 
       // 2. Clear wave data
       _waveManager.clearData();
-
-      // 3. Stop background service if running
-      if (await _backgroundService.checkIsRunning()) {
-        await _backgroundService.stopService();
-      }
 
       // 4. Reset audio session
       await _audioSessionService.reset();
@@ -328,11 +308,6 @@ class RecorderManager {
       _waveManager.clearData();
       _waveManager.startRecording();
 
-      // 3. Ensure background service is running
-      if (!await _backgroundService.checkIsRunning()) {
-        await _backgroundService.startService();
-      }
-
       final timestamp = DateTime.now();
       print('RecorderManager: Recording restarted');
       
@@ -355,11 +330,6 @@ class RecorderManager {
     }
   }
 
-  /// Checks if background service is running
-  Future<bool> isBackgroundServiceRunning() async {
-    return await _backgroundService.checkIsRunning();
-  }
-
   /// Resets the manager to initial state
   /// 
   /// Stops any active recording and clears all data.
@@ -374,11 +344,6 @@ class RecorderManager {
 
       // Clear wave data
       _waveManager.clearData();
-
-      // Stop background service
-      if (await _backgroundService.checkIsRunning()) {
-        await _backgroundService.stopService();
-      }
 
       // Reset audio session
       await _audioSessionService.reset();
@@ -402,12 +367,7 @@ class RecorderManager {
       await _interruptionSubscription?.cancel();
       await _interruptionController.close();
 
-      // 2. Stop background service if running
-      if (await _backgroundService.checkIsRunning()) {
-        await _backgroundService.stopService();
-      }
-
-      // 3. Dispose services
+      // 2. Dispose services
       await _recorder.dispose();
       _audioSessionService.reset();
       _waveManager.clearData();
