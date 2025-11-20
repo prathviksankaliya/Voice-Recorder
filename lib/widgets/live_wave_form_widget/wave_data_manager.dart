@@ -19,7 +19,8 @@ class WaveDataManager {
 
   /// Maximum number of amplitude values to keep in buffer
   /// This determines how many bars are shown in the waveform
-  static const int _maxBufferSize = 100;
+  /// Reduced for better performance and more responsive visualization
+  static const int _maxBufferSize = 50;
 
   /// Buffer storing normalized amplitude values (0.0 to 1.0)
   final List<double> _amplitudeBuffer = [];
@@ -126,7 +127,7 @@ class WaveDataManager {
 
   /// Normalizes amplitude from decibels to 0.0-1.0 range
   /// 
-  /// Typical amplitude range is -160 dB (silence) to 0 dB (maximum).
+  /// Based on actual Android device data: -2 dB (loud) to -40 dB (quiet)
   /// This method converts that to a 0.0-1.0 range for visualization.
   /// 
   /// [amplitude] - Raw amplitude in decibels
@@ -138,21 +139,17 @@ class WaveDataManager {
       return 0.0;
     }
 
-    // Typical range: -160 dB to 0 dB
-    const double minDb = -160.0;
-    const double maxDb = 0.0;
+    // Actual range from Android device: -2 dB (loud) to -40 dB (quiet/silence)
+    const double minDb = -40.0;  // Quiet sounds
+    const double maxDb = -2.0;   // Loud sounds
 
     // Clamp to valid range
     final clampedDb = amplitude.clamp(minDb, maxDb);
 
-    // Normalize to 0.0-1.0
+    // Simple linear normalization to 0.0-1.0
     final normalized = (clampedDb - minDb) / (maxDb - minDb);
 
-    // Apply slight curve for better visualization
-    // This makes quieter sounds more visible
-    final curved = pow(normalized, 0.7).toDouble();
-
-    return curved.clamp(0.0, 1.0);
+    return normalized.clamp(0.0, 1.0);
   }
 
   /// Clears all amplitude data from the buffer

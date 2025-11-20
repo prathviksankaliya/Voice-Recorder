@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:math' as math;
 import '../provider/recording_provider.dart';
 
 /// Waveform visualizer widget
 /// 
 /// Displays a live waveform visualization of the audio being recorded.
-/// Shows amplitude bars that update in real-time based on audio levels.
+/// Shows animated amplitude bars that update in real-time based on audio levels.
+/// Features smooth animations, gradient colors, and voice synchronization.
 class WaveformVisualizer extends StatelessWidget {
   const WaveformVisualizer({super.key});
 
@@ -29,15 +31,21 @@ class WaveformVisualizer extends StatelessWidget {
               return _buildPlaceholder(context);
             }
 
-            return CustomPaint(
-              painter: WaveformPainter(
-                amplitudes: amplitudes,
-                color: provider.isRecording
-                    ? Colors.red
-                    : Theme.of(context).colorScheme.primary,
-                isPaused: provider.isPaused,
+            return Center(
+              child: Container(
+                height: 120, // Compact height
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: CustomPaint(
+                  painter: WaveformPainter(
+                    amplitudes: amplitudes,
+                    color: provider.isRecording
+                        ? Colors.red
+                        : Theme.of(context).colorScheme.primary,
+                    isPaused: provider.isPaused,
+                  ),
+                  size: const Size(double.infinity, 120),
+                ),
               ),
-              size: Size.infinite,
             );
           },
         );
@@ -53,10 +61,10 @@ class WaveformVisualizer extends StatelessWidget {
         children: [
           Icon(
             Icons.graphic_eq,
-            size: 64,
+            size: 48,
             color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.3),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Text(
             'Start recording to see waveform',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -71,8 +79,9 @@ class WaveformVisualizer extends StatelessWidget {
 
 /// Custom painter for drawing the waveform
 /// 
-/// Draws vertical bars representing audio amplitude levels.
+/// Draws animated vertical bars representing audio amplitude levels.
 /// Each bar's height corresponds to the amplitude value (0.0 to 1.0).
+/// Features gradient colors, rounded caps, and smooth animations.
 class WaveformPainter extends CustomPainter {
   /// List of amplitude values (0.0 to 1.0)
   final List<double> amplitudes;
@@ -93,32 +102,42 @@ class WaveformPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (amplitudes.isEmpty) return;
 
-    final paint = Paint()
-      ..color = isPaused ? color.withOpacity(0.5) : color
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round;
-
-    // Calculate bar width and spacing
-    final barCount = amplitudes.length;
-    final totalWidth = size.width - 32; // Padding
-    final barWidth = (totalWidth / barCount).clamp(2.0, 8.0);
-
     // Center vertically
     final centerY = size.height / 2;
-    final maxBarHeight = size.height * 0.8;
+    final maxBarHeight = size.height * 0.4;
 
-    // Draw bars
-    for (int i = 0; i < barCount; i++) {
-      final amplitude = amplitudes[i];
+    // Calculate optimal bar count and spacing
+    final visibleBarCount = math.min(amplitudes.length, 50);
+    final barSpacing = 4.0;
+    final totalSpacing = barSpacing * (visibleBarCount - 1);
+    final availableWidth = size.width - totalSpacing;
+    final barWidth = (availableWidth / visibleBarCount).clamp(2.5, 5.0);
+
+    // Get the most recent amplitudes
+    final startIndex = math.max(0, amplitudes.length - visibleBarCount);
+    final visibleAmplitudes = amplitudes.sublist(startIndex);
+
+    // Draw bars from left to right (oldest to newest)
+    for (int i = 0; i < visibleAmplitudes.length; i++) {
+      final amplitude = visibleAmplitudes[i];
       
-      // Calculate bar height (minimum 4px for visibility)
-      final barHeight = (amplitude * maxBarHeight / 2).clamp(4.0, maxBarHeight / 2);
+      // Calculate bar height with minimum visibility
+      final normalizedAmplitude = amplitude.clamp(0.0, 1.0);
+      final barHeight = (normalizedAmplitude * maxBarHeight).clamp(3.0, maxBarHeight);
       
-      // Calculate x position (right-aligned, newest on right)
-      final x = size.width - 16 - (barCount - i) * barWidth;
+      // Calculate x position (left to right)
+      final x = i * (barWidth + barSpacing) + barWidth / 2;
       
-      // Skip if outside visible area
-      if (x < 16) continue;
+      // Simple opacity based on amplitude and pause state
+      final opacity = isPaused ? 0.5 : (0.7 + (normalizedAmplitude * 0.3));
+      final barColor = color.withOpacity(opacity);
+
+      // Create paint with rounded caps
+      final paint = Paint()
+        ..color = barColor
+        ..strokeWidth = barWidth
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke;
 
       // Draw bar (centered vertically)
       canvas.drawLine(

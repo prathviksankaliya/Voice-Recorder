@@ -3,15 +3,24 @@ import 'package:audio_session/audio_session.dart';
 import '../../core/enums/enums.dart';
 import '../../core/models/interruption_data.dart';
 
-/// Manages audio session configuration and interruption detection
+/// Manages audio session configuration and interruption detection.
 ///
-/// This singleton service:
-/// - Configures audio session for recording
-/// - Detects various types of audio interruptions (calls, headphone disconnect, etc.)
-/// - Emits interruption events through a stream
-/// - Handles audio focus and routing
-///
+/// Configures audio for recording/playback and monitors interruptions
+/// like phone calls, media playback, and device disconnections.
 /// Use [AudioSessionService.instance] to access the singleton.
+///
+/// Supported audio interruption scenarios:
+/// - Phone/VoIP calls (WhatsApp, Teams, Zoom, etc.)
+/// - Media playback (Spotify, YouTube, etc.)
+/// - Headphone/Bluetooth disconnection
+/// - Audio ducking (navigation, alarms)
+/// - Becoming noisy (sudden unplugging)
+/// - Audio route changes
+/// - Camera usage, screen recording
+/// - Voice assistants (Siri/Google)
+/// - Low battery mode
+/// - Split screen mode (Android)
+///
 class AudioSessionService {
   /// Singleton instance
   static final AudioSessionService instance = AudioSessionService._internal();
