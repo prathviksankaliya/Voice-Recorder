@@ -11,6 +11,9 @@ void main() {
 /// 
 /// Sets up the Provider for state management and
 /// initializes the recording screen.
+/// 
+/// This is the demo app. For using the recorder package in your own app,
+/// import 'package:recorder/recorder.dart' and use RecorderManager directly.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -19,7 +22,7 @@ class MyApp extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (context) => RecordingProvider(),
       child: MaterialApp(
-        title: 'Audio Recorder',
+        title: 'Audio Recorder Demo',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
