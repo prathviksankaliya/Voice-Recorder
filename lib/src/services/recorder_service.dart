@@ -5,6 +5,7 @@ import 'package:record/record.dart';
 import '../enums/enums.dart';
 import '../config/recorder_config.dart';
 import '../config/storage_config.dart';
+import '../exceptions/recorder_exception.dart';
 import 'recorder_storage_handler.dart';
 
 /// Low-level audio recording service
@@ -78,6 +79,7 @@ class RecorderService {
   /// Updates the storage configuration
   void updateStorageConfig(StorageConfig config) {
     _storageConfig = config;
+    _storageHandler.setConfig(config);
   }
 
   /// Initializes the recorder
@@ -86,6 +88,7 @@ class RecorderService {
   /// Checks if recording permission is granted.
   ///
   /// Returns true if initialization was successful
+  /// Throws [RecorderException] if initialization fails
   Future<bool> initialize() async {
     try {
       // Check if we have recording permission
@@ -93,14 +96,17 @@ class RecorderService {
 
       if (!hasPermission) {
         print('RecorderService: Microphone permission not granted');
-        return false;
+        throw RecorderException.permissionDenied();
       }
 
       print('RecorderService: Initialized successfully');
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('RecorderService: Initialization error - $e');
-      return false;
+      if (e is RecorderException) {
+        rethrow;
+      }
+      throw RecorderException.initializationFailed(e);
     }
   }
 
@@ -109,7 +115,7 @@ class RecorderService {
   /// Creates a new file with timestamp-based name and begins recording.
   /// If a recording is already in progress, it will be stopped first.
   ///
-  /// Throws an exception if recording fails to start.
+  /// Throws [RecorderException] if recording fails to start.
   Future<void> startRecording() async {
     try {
       // Stop any existing recording
@@ -124,12 +130,11 @@ class RecorderService {
       // Get file path from storage handler
       final fileName = _recordingFileName;
       if (fileName == null) {
-        throw Exception('Failed to generate recording filename');
+        throw RecorderException.recordingFailed('Failed to generate recording filename');
       }
 
-      _recordingFileFullPath = _storageConfig.useHiddenFiles
-          ? await _storageHandler.getHiddenRecordingPath(fileName)
-          : await _storageHandler.getRecordingPath(fileName);
+      // Get recording path using storage handler
+      _recordingFileFullPath = await _storageHandler.getRecordingPath(fileName: fileName);
 
       // Use configuration
       final recordConfig = _config.toRecordConfig();
@@ -137,7 +142,7 @@ class RecorderService {
       // Start recording
       final filePath = _recordingFileFullPath;
       if (filePath == null) {
-        throw Exception('Failed to get recording file path');
+        throw RecorderException.storageError('Failed to get recording file path');
       }
 
       await _recorder.start(recordConfig, path: filePath);
@@ -149,9 +154,12 @@ class RecorderService {
       _startAmplitudeStream();
 
       print('RecorderService: Recording started - $_recordingFileName');
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('RecorderService: Start recording error - $e');
-      rethrow;
+      if (e is RecorderException) {
+        rethrow;
+      }
+      throw RecorderException.recordingFailed(e);
     }
   }
 
@@ -159,20 +167,24 @@ class RecorderService {
   ///
   /// Recording can be resumed later from the same point.
   /// Amplitude stream will be paused as well.
+  /// 
+  /// Throws [RecorderException] if pause fails.
   Future<void> pauseRecording() async {
     try {
       if (!isRecording) {
-        print('RecorderService: Cannot pause - not recording');
-        return;
+        throw RecorderException.invalidState('Cannot pause - not recording');
       }
 
       await _recorder.pause();
       _state = RecordingState.paused;
 
       print('RecorderService: Recording paused');
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('RecorderService: Pause recording error - $e');
-      rethrow;
+      if (e is RecorderException) {
+        rethrow;
+      }
+      throw RecorderException.recordingFailed(e);
     }
   }
 
@@ -180,32 +192,37 @@ class RecorderService {
   ///
   /// Continues recording from where it was paused.
   /// Amplitude stream will resume as well.
+  /// 
+  /// Throws [RecorderException] if resume fails.
   Future<void> resumeRecording() async {
     try {
       if (!isPaused) {
-        print('RecorderService: Cannot resume - not paused');
-        return;
+        throw RecorderException.invalidState('Cannot resume - not paused');
       }
 
       await _recorder.resume();
       _state = RecordingState.recording;
 
       print('RecorderService: Recording resumed');
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('RecorderService: Resume recording error - $e');
-      rethrow;
+      if (e is RecorderException) {
+        rethrow;
+      }
+      throw RecorderException.recordingFailed(e);
     }
   }
 
   /// Stops the current recording and saves the file
   ///
-  /// Returns the File object of the saved recording, or null if failed.
+  /// Returns the File object of the saved recording.
   /// After stopping, the recording cannot be resumed.
+  /// 
+  /// Throws [RecorderException] if stop fails or file is not found.
   Future<File?> stopRecording() async {
     try {
       if (_state == RecordingState.idle || _state == RecordingState.stopped) {
-        print('RecorderService: No active recording to stop');
-        return null;
+        throw RecorderException.invalidState('No active recording to stop');
       }
 
       // Stop recording
@@ -218,26 +235,28 @@ class RecorderService {
       _state = RecordingState.stopped;
 
       if (path == null) {
-        print('RecorderService: Recording stopped but no file path returned');
-        return null;
+        throw RecorderException.fileNotFound('Recording stopped but no file path returned');
       }
 
       // Get the file
       final file = File(path);
 
       if (!await file.exists()) {
-        print('RecorderService: Recording file does not exist at path: $path');
-        return null;
+        throw RecorderException.fileNotFound(path);
       }
 
       print('RecorderService: Recording stopped successfully - ${file.path}');
       return file;
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('RecorderService: Stop recording error - $e');
       // Ensure cleanup happens even on error
       await _stopAmplitudeStream();
       _state = RecordingState.stopped;
-      rethrow;
+      
+      if (e is RecorderException) {
+        rethrow;
+      }
+      throw RecorderException.recordingFailed(e);
     }
   }
 
@@ -245,6 +264,8 @@ class RecorderService {
   ///
   /// Stops the current recording (if any) and starts a new one.
   /// The previous recording file will be deleted.
+  /// 
+  /// Throws [RecorderException] if restart fails.
   Future<void> restartRecording() async {
     try {
       // Delete current recording if exists
@@ -263,15 +284,20 @@ class RecorderService {
       await startRecording();
 
       print('RecorderService: Recording restarted');
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('RecorderService: Restart recording error - $e');
-      rethrow;
+      if (e is RecorderException) {
+        rethrow;
+      }
+      throw RecorderException.recordingFailed(e);
     }
   }
 
   /// Deletes the current recording file
   ///
   /// Stops the recording if active and deletes the file from storage.
+  /// 
+  /// Throws [RecorderException] if deletion fails.
   Future<void> deleteRecording() async {
     try {
       // Stop recording if active
@@ -285,33 +311,48 @@ class RecorderService {
       if (filePath != null) {
         final deleted = await _storageHandler.deleteRecording(filePath);
 
-        if (deleted) {
-          print('RecorderService: Recording deleted');
+        if (!deleted) {
+          throw RecorderException.storageError('Failed to delete recording file');
         }
+        
+        print('RecorderService: Recording deleted');
       }
 
       // Reset state
       _state = RecordingState.idle;
       _recordingFileName = null;
       _recordingFileFullPath = null;
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('RecorderService: Delete recording error - $e');
-      rethrow;
+      if (e is RecorderException) {
+        rethrow;
+      }
+      throw RecorderException.storageError(e);
     }
   }
 
   /// Starts streaming amplitude data for waveform visualization
   void _startAmplitudeStream() {
-    _amplitudeSubscription = _recorder.onAmplitudeChanged(const Duration(milliseconds: 100)).listen((amplitude) {
-      // Forward amplitude to our broadcast stream
-      if (!_amplitudeController.isClosed) {
-        _amplitudeController.add(amplitude);
-      }
-    });
+    _amplitudeSubscription = _recorder.onAmplitudeChanged(const Duration(milliseconds: 100)).listen(
+      (amplitude) {
+        // Forward amplitude to our broadcast stream
+        if (!_amplitudeController.isClosed) {
+          _amplitudeController.add(amplitude);
+        }
+      },
+      onError: (error) {
+        print('RecorderService: Amplitude stream error - $error');
+      },
+    );
 
-    _recorder.onStateChanged().listen((event) {
-      log("log: newStateUpdate ${event.name}");
-    });
+    _recorder.onStateChanged().listen(
+      (event) {
+        log("log: newStateUpdate ${event.name}");
+      },
+      onError: (error) {
+        print('RecorderService: State change stream error - $error');
+      },
+    );
   }
 
   /// Stops the amplitude stream
@@ -335,7 +376,9 @@ class RecorderService {
       await _stopAmplitudeStream();
       
       // Close amplitude controller
-      await _amplitudeController.close();
+      if (!_amplitudeController.isClosed) {
+        await _amplitudeController.close();
+      }
 
       // Dispose recorder
       await _recorder.dispose();
@@ -343,6 +386,7 @@ class RecorderService {
       print('RecorderService: Disposed');
     } catch (e) {
       print('RecorderService: Dispose error - $e');
+      // Don't rethrow in dispose - just log the error
     }
   }
 }

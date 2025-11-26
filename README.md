@@ -1,63 +1,77 @@
-# Flutter Audio Recorder
+# Voice Recorder
 
-A comprehensive, independent audio recording module for Flutter with waveform visualization, interruption handling, and flexible configuration. Designed to be easily integrated into any Flutter project.
+[![pub package](https://img.shields.io/pub/v/voice_recorder.svg)](https://pub.dev/packages/voice_recorder)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## ✨ Features
+A comprehensive audio recording package for Flutter with real-time waveform visualization, automatic interruption handling, and flexible configuration options.
 
-- 🎙️ **High-quality audio recording** with customizable settings
-- 📊 **Real-time waveform visualization**
-- 📞 **Automatic interruption handling** (phone calls, headphones disconnect, etc.)
-- ⏸️ **Pause/resume support**
-- 🎚️ **Multiple quality presets** (low, medium, high, voice-optimized)
-- 💾 **Configurable storage** options (hidden/visible files, custom paths)
-- 🏗️ **Clean architecture** with dependency injection for testing
-- 🔧 **Flexible configuration** for Android and iOS
-- ⚡ **Callback-based** or **Stream-based** APIs
-- 🧪 **Testable** with mock implementations
+## Features
 
-## 📦 Installation
+- 🎙️ **High-Quality Audio Recording** - Multiple quality presets and custom configuration
+- 📊 **Real-Time Waveform Visualization** - Live amplitude data for visual feedback
+- ⏸️ **Pause/Resume Support** - Full control over recording lifecycle
+- 📞 **Automatic Interruption Handling** - Handles phone calls, headphone disconnections, and more
+- ⚙️ **Flexible Configuration** - Quality presets and custom settings
+- 💾 **Configurable Storage** - Choose where and how recordings are saved
+- 🏗️ **Clean Architecture** - Well-structured, testable, and maintainable code
+- 🔒 **Production Ready** - Comprehensive error handling and state management
+
+## Installation
 
 Add this to your package's `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  recorder:
-    path: ../recorder  # Or your package path
+  voice_recorder: ^0.1.0
 ```
 
-### Platform Setup
+Then run:
 
-#### Android
+```bash
+flutter pub get
+```
 
-Add permissions to `android/app/src/main/AndroidManifest.xml`:
+## Platform Setup
+
+### Android
+
+Add the following permissions to `android/app/src/main/AndroidManifest.xml`:
 
 ```xml
-<uses-permission android:name="android.permission.RECORD_AUDIO" />
-<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
+                     android:maxSdkVersion="28" />
+    
+    <application ...>
+        ...
+    </application>
+</manifest>
 ```
 
-#### iOS
+### iOS
 
-Add permissions to `ios/Runner/Info.plist`:
+Add the following to `ios/Runner/Info.plist`:
 
 ```xml
 <key>NSMicrophoneUsageDescription</key>
 <string>This app needs microphone access to record audio</string>
 ```
 
-## 🚀 Quick Start
-
-### Basic Usage
+## Quick Start
 
 ```dart
-import 'package:recorder/recorder.dart';
+import 'package:voice_recorder/voice_recorder.dart';
 
-// Create a recorder manager
+// Create recorder instance
 final recorder = RecorderManager(
   config: RecorderConfig.voice(),
-  onStateChanged: (state) => print('State: $state'),
-  onError: (error) => print('Error: $error'),
+  onStateChanged: (state) {
+    print('Recording state: $state');
+  },
+  onError: (error) {
+    print('Error: ${error.message}');
+  },
 );
 
 // Initialize
@@ -66,10 +80,10 @@ await recorder.initialize();
 // Start recording
 await recorder.startRecording();
 
-// Pause
+// Pause recording
 await recorder.pauseRecording();
 
-// Resume
+// Resume recording
 await recorder.resumeRecording();
 
 // Stop and get file
@@ -80,65 +94,29 @@ print('Recording saved: ${file.path}');
 await recorder.dispose();
 ```
 
-### With Provider (State Management)
-
-```dart
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:recorder/recorder.dart';
-
-class RecordingProvider extends ChangeNotifier {
-  final RecorderManager _manager;
-
-  RecordingProvider()
-      : _manager = RecorderManager(
-          config: RecorderConfig.voice(),
-          onStateChanged: (state) => notifyListeners(),
-        );
-
-  RecordingState get state => _manager.recordingState;
-  bool get isRecording => _manager.isRecording;
-
-  Future<void> initialize() async {
-    await _manager.initialize();
-    notifyListeners();
-  }
-
-  Future<void> startRecording() async {
-    await _manager.startRecording();
-  }
-
-  Future<void> stopRecording() async {
-    await _manager.stopRecording();
-  }
-
-  @override
-  void dispose() {
-    _manager.dispose();
-    super.dispose();
-  }
-}
-```
-
-## ⚙️ Configuration
+## Configuration
 
 ### Quality Presets
 
+Choose from predefined quality presets:
+
 ```dart
-// Low quality (64 kbps, 22.05 kHz) - smallest file size
+// Low quality - 64 kbps, 22.05 kHz (smallest file size)
 RecorderConfig.lowQuality()
 
-// Medium quality (128 kbps, 44.1 kHz) - balanced
+// Medium quality - 128 kbps, 44.1 kHz (balanced)
 RecorderConfig.mediumQuality()
 
-// High quality (256 kbps, 48 kHz) - best quality
+// High quality - 256 kbps, 48 kHz (best quality)
 RecorderConfig.highQuality()
 
-// Voice optimized - best for voice recording
+// Voice optimized - 96 kbps, 44.1 kHz (recommended for voice)
 RecorderConfig.voice()
 ```
 
 ### Custom Configuration
+
+Create custom recording configuration:
 
 ```dart
 final config = RecorderConfig(
@@ -151,13 +129,6 @@ final config = RecorderConfig(
   noiseSuppress: true,
   filePrefix: 'my_recording',
   fileExtension: 'm4a',
-  androidConfig: AndroidRecorderConfig(
-    audioSource: AndroidAudioSource.mic,
-    serviceConfig: AndroidServiceConfig(
-      title: 'Recording',
-      content: 'Recording in progress...',
-    ),
-  ),
 );
 
 final recorder = RecorderManager(config: config);
@@ -165,68 +136,60 @@ final recorder = RecorderManager(config: config);
 
 ### Storage Configuration
 
+Control where recordings are saved:
+
 ```dart
-// Default: hidden files in app directory
-final storageConfig = StorageConfig.defaultConfig();
+// Use temporary directory (default)
+StorageConfig.tempDirectory()
 
-// Visible files in documents
-final storageConfig = StorageConfig.visible();
-
-// With automatic cleanup
-final storageConfig = StorageConfig.withCleanup(
-  maxAge: Duration(days: 30),
-  maxRecordings: 100,
-);
+// Use app documents directory
+StorageConfig.visible()
 
 // Custom directory
-final storageConfig = StorageConfig(
-  customDirectory: '/path/to/recordings',
-  useHiddenFiles: false,
-);
+StorageConfig.withDirectory('/path/to/directory')
 
-final recorder = RecorderManager(
-  config: RecorderConfig.voice(),
-  storageConfig: storageConfig,
-);
+// Specific file path
+StorageConfig.withPath('/path/to/file.m4a')
+
+// Custom naming
+StorageConfig.withCustomNaming(
+  prefix: 'voice_note',
+  extension: 'm4a',
+)
 ```
 
-## 🎨 UI Components
+## Waveform Visualization
 
-### Waveform Visualization
-
-The package includes a waveform data manager that you can use to build custom visualizations:
+Access real-time amplitude data for waveform visualization:
 
 ```dart
-import 'package:recorder/recorder.dart';
+// Listen to amplitude stream
+recorder.amplitudeStream.listen((amplitude) {
+  print('Current amplitude: ${amplitude.current} dB');
+});
 
-class WaveformWidget extends StatelessWidget {
-  final RecorderManager recorder;
+// Get waveform buffer
+List<double> waveform = recorder.waveformBuffer;
 
-  const WaveformWidget({required this.recorder});
+// Check if data is available
+bool hasData = recorder.hasAmplitudeData;
 
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<double>>(
-      stream: recorder.waveManager.waveformStream,
-      builder: (context, snapshot) {
-        final waveform = snapshot.data ?? [];
-        return CustomPaint(
-          painter: WaveformPainter(waveform),
-        );
-      },
-    );
-  }
-}
+// Access wave manager directly
+final waveManager = recorder.waveManager;
+waveManager.waveformStream.listen((buffer) {
+  // Update UI with waveform data
+});
 ```
 
-## 🔔 Interruption Handling
+## Interruption Handling
 
-The recorder automatically handles interruptions like phone calls, headphone disconnects, etc.:
+Automatically handle audio interruptions:
 
 ```dart
 final recorder = RecorderManager(
   onInterruption: (interruption) {
-    print('Interruption: ${interruption.type}');
+    print('Interrupted by: ${interruption.type}');
+    
     if (interruption.shouldPause) {
       // Recording was automatically paused
       showNotification('Recording paused due to ${interruption.type}');
@@ -234,77 +197,161 @@ final recorder = RecorderManager(
   },
 );
 
-// Or listen to the stream
+// Listen to interruption stream
 recorder.interruptionStream.listen((interruption) {
-  // Handle interruption
+  switch (interruption.type) {
+    case InterruptionType.phoneCall:
+      // Handle phone call
+      break;
+    case InterruptionType.headphoneDisconnect:
+      // Handle headphone disconnect
+      break;
+    // ... other cases
+  }
 });
 ```
 
-## 🧪 Testing
+Supported interruption types:
+- Phone calls (regular and VoIP)
+- Media playback from other apps
+- Headphone/Bluetooth disconnection
+- Audio ducking (navigation, alarms)
+- System audio route changes
 
-The package is designed for testability with dependency injection:
+## Error Handling
+
+Comprehensive error handling with specific error types:
 
 ```dart
-import 'package:recorder/recorder.dart';
-import 'package:mockito/mockito.dart';
-
-class MockRecorderService extends Mock implements RecorderService {}
-
-void main() {
-  test('recorder starts successfully', () async {
-    final mockService = MockRecorderService();
-    final recorder = RecorderManager(recorder: mockService);
-    
-    when(mockService.initialize()).thenAnswer((_) async => true);
-    when(mockService.startRecording()).thenAnswer((_) async => null);
-    
-    await recorder.initialize();
-    await recorder.startRecording();
-    
-    verify(mockService.startRecording()).called(1);
-  });
+try {
+  await recorder.startRecording();
+} on RecorderException catch (e) {
+  switch (e.type) {
+    case RecorderErrorType.permissionDenied:
+      // Request permissions
+      break;
+    case RecorderErrorType.initializationFailed:
+      // Handle initialization error
+      break;
+    case RecorderErrorType.recordingFailed:
+      // Handle recording error
+      break;
+    case RecorderErrorType.storageError:
+      // Handle storage error
+      break;
+    default:
+      // Handle other errors
+  }
+  
+  print('Error: ${e.message}');
+  if (e.originalError != null) {
+    print('Original error: ${e.originalError}');
+  }
 }
 ```
 
-## 📱 Example App
+## Complete Example
 
-Check the `example/` directory for a complete working example with:
-- Recording controls
-- Waveform visualization
-- Permission handling
-- Error handling
-- File management
+```dart
+import 'package:flutter/material.dart';
+import 'package:recorder/recorder.dart';
 
-## 🏗️ Architecture
+class RecordingScreen extends StatefulWidget {
+  @override
+  State<RecordingScreen> createState() => _RecordingScreenState();
+}
 
+class _RecordingScreenState extends State<RecordingScreen> {
+  late RecorderManager _recorder;
+  RecordingState _state = RecordingState.idle;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeRecorder();
+  }
+
+  void _initializeRecorder() {
+    _recorder = RecorderManager(
+      config: RecorderConfig.voice(),
+      storageConfig: StorageConfig.visible(),
+      onStateChanged: (state) {
+        setState(() => _state = state);
+      },
+      onError: (error) {
+        setState(() => _errorMessage = error.message);
+      },
+      onInterruption: (interruption) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Interrupted: ${interruption.type.name}')),
+        );
+      },
+    );
+    
+    _recorder.initialize();
+  }
+
+  @override
+  void dispose() {
+    _recorder.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      await _recorder.startRecording();
+    } catch (e) {
+      // Error handled by callback
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    try {
+      final (file, timestamp) = await _recorder.stopRecording();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Saved: ${file.path}')),
+      );
+    } catch (e) {
+      // Error handled by callback
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Recorder')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('State: ${_state.name}'),
+            if (_errorMessage != null)
+              Text('Error: $_errorMessage', style: TextStyle(color: Colors.red)),
+            SizedBox(height: 20),
+            if (_state == RecordingState.idle)
+              ElevatedButton(
+                onPressed: _startRecording,
+                child: Text('Start Recording'),
+              ),
+            if (_state == RecordingState.recording)
+              ElevatedButton(
+                onPressed: _stopRecording,
+                child: Text('Stop Recording'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 ```
-┌─────────────────────────────────────────┐
-│           UI Layer (Your App)           │
-│  ┌─────────────────────────────────┐    │
-│  │   RecordingProvider/Widget      │    │
-│  └─────────────────────────────────┘    │
-└──────────────────┬──────────────────────┘
-                   ▼
-┌─────────────────────────────────────────┐
-│        RecorderManager (Public API)     │
-│          - Callbacks & Streams          │
-│          - Configuration                │
-│          - Error Handling               │
-└──────────────────┬──────────────────────┘
-                   │
-    ┌──────────────┼──────────────┐
-    │              │              │
-┌───▼────┐  ┌──────▼─────┐   ┌────▼────┐
-│Recorder│  │AudioSession│   │WaveData │
-│Service │  │  Service   │   │ Manager │
-└────────┘  └────────────┘   └─────────┘
-```
 
-## 🔧 API Reference
+## API Reference
 
 ### RecorderManager
 
-Main class for recording operations.
+Main class for managing audio recordings.
 
 #### Constructor
 
@@ -327,6 +374,7 @@ RecorderManager({
 - `Future<(File, DateTime)> stopRecording()` - Stop and save recording
 - `Future<void> deleteRecording()` - Delete current recording
 - `Future<DateTime> restartRecording()` - Restart recording
+- `Future<void> reset()` - Reset to initial state
 - `Future<void> dispose()` - Clean up resources
 
 #### Properties
@@ -334,30 +382,89 @@ RecorderManager({
 - `RecordingState recordingState` - Current state
 - `bool isRecording` - Whether recording
 - `bool isPaused` - Whether paused
+- `bool isStopped` - Whether stopped
 - `bool isInitialized` - Whether initialized
 - `String? currentRecordingFileName` - Current file name
+- `String? currentRecordingFullPath` - Current file path
 - `List<double> waveformBuffer` - Waveform data
 - `Stream<Amplitude> amplitudeStream` - Amplitude stream
 - `Stream<InterruptionData> interruptionStream` - Interruption stream
 
-## 🤝 Contributing
+## Permissions
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+The package requires microphone permissions. Use the `permission_handler` package (already included) to request permissions:
 
-## 📄 License
+```dart
+import 'package:permission_handler/permission_handler.dart';
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Future<bool> requestPermissions() async {
+  final status = await Permission.microphone.request();
+  return status.isGranted;
+}
+```
 
-## 🙏 Acknowledgments
+## Testing
 
-- Built with [record](https://pub.dev/packages/record) package
-- Uses [audio_session](https://pub.dev/packages/audio_session) for interruption handling
-- [permission_handler](https://pub.dev/packages/permission_handler) for permissions
+The package includes comprehensive tests. Run them with:
 
-## 📞 Support
+```bash
+flutter test
+```
 
-For issues, questions, or suggestions, please file an issue on GitHub.
+## Example App
 
----
+A complete example app is included in the `example/` directory. Run it with:
 
-Made with ❤️ for the Flutter community
+```bash
+cd example
+flutter run
+```
+
+## Troubleshooting
+
+### Permission Denied
+
+Make sure you've added the required permissions to your platform-specific configuration files and requested them at runtime.
+
+### Recording Not Starting
+
+Ensure you've called `initialize()` before starting recording:
+
+```dart
+await recorder.initialize();
+await recorder.startRecording();
+```
+
+### File Not Found
+
+Check your storage configuration and ensure the app has write permissions for the specified directory.
+
+### Interruptions Not Working
+
+Make sure you've initialized the audio session by calling `initialize()` on the RecorderManager.
+
+## Contributing
+
+Contributions are welcome! Please read our contributing guidelines and submit pull requests to our repository.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+- 📧 Email: support@example.com
+- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/recorder/issues)
+- 📖 Documentation: [GitHub Wiki](https://github.com/yourusername/recorder/wiki)
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a list of changes in each version.
+
+## Credits
+
+Built with ❤️ using:
+- [record](https://pub.dev/packages/record) - Audio recording
+- [audio_session](https://pub.dev/packages/audio_session) - Audio session management
+- [permission_handler](https://pub.dev/packages/permission_handler) - Permission handling
+- [path_provider](https://pub.dev/packages/path_provider) - File path management

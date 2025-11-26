@@ -1,7 +1,9 @@
-name: recorder
-description: A comprehensive audio recording module for Flutter with waveform visualization, interruption handling, and flexible configuration.
+name: voice_recorder
+description: A comprehensive audio recording package for Flutter with waveform visualization, interruption handling, and flexible configuration. Perfect for voice recording, audio notes, and podcast apps.
 version: 0.1.0
-homepage: https://github.com/yourusername/recorder
+homepage: https://github.com/prathviksankaliya/recorder
+repository: https://github.com/prathviksankaliya/recorder
+documentation: https://github.com/prathviksankaliya/recorder#readme
 
 environment:
   sdk: '>=3.8.1 <4.0.0'
@@ -10,17 +12,17 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
   record: ^6.1.2
   audio_session: ^0.2.2
   permission_handler: ^12.0.1
   path_provider: ^2.1.5
-  provider: ^6.1.5+1
+  path: ^1.9.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
 
-flutter:
-  uses-material-design: true
+# Package does not include UI assets
+# flutter:
+#   uses-material-design: true

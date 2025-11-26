@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:audio_session/audio_session.dart';
-import '../../core/enums/enums.dart';
-import '../../core/models/interruption_data.dart';
+import '../enums/enums.dart';
+import '../models/interruption_data.dart';
 
 /// Manages audio session configuration and interruption detection.
 ///

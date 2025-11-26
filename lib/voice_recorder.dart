@@ -1,4 +1,4 @@
-/// Flutter Audio Recorder Package
+/// Voice Recorder Package
 /// 
 /// A comprehensive audio recording solution with waveform visualization,
 /// interruption handling, and flexible configuration.
@@ -15,7 +15,7 @@
 /// ## Quick Start
 /// 
 /// ```dart
-/// import 'package:recorder/recorder.dart';
+/// import 'package:voice_recorder/voice_recorder.dart';
 /// 
 /// // Create a recorder manager
 /// final recorder = RecorderManager(
@@ -55,6 +55,7 @@
 ///   noiseSuppress: true,
 /// )
 /// ```
+library voice_recorder;
 
 // Core manager
 export 'src/manager/recorder_manager.dart';

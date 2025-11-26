@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:recorder/recorder.dart';
+import 'package:voice_recorder/voice_recorder.dart';
 
 void main() {
   runApp(const RecorderExampleApp());
