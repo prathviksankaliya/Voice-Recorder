@@ -55,7 +55,7 @@
 ///   noiseSuppress: true,
 /// )
 /// ```
-library voice_recorder;
+library;
 
 // Core manager
 export 'src/manager/recorder_manager.dart';
