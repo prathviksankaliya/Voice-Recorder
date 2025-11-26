@@ -1,61 +1,46 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:record/record.dart';
 import '../enums/enums.dart';
 import '../models/interruption_data.dart';
+import '../models/recording.dart';
 import '../services/audio_session_service.dart';
 import '../services/recorder_service.dart';
+import '../services/recording_timer_service.dart';
 import '../widgets/wave_data_manager.dart';
 import '../config/recorder_config.dart';
 import '../config/storage_config.dart';
 import '../exceptions/recorder_exception.dart';
 
-/// Callback for recording state changes
+/// Called when recording state changes
 typedef RecordingStateCallback = void Function(RecordingState state);
 
-/// Callback for errors
+/// Called when an error occurs
 typedef ErrorCallback = void Function(RecorderException error);
 
-/// Callback for interruptions
+/// Called when recording is interrupted
 typedef InterruptionCallback = void Function(InterruptionData interruption);
 
-/// Orchestrates recording services and provides a unified API
-/// 
-/// This is the main coordinator that:
-/// - Manages recording services (recorder, waveform)
-/// - Coordinates service interactions and lifecycle
-/// - Provides a simple API for the UI layer
-/// - Handles errors and cleanup
-/// - Connects services through streams
-/// 
-/// Use this class as the single entry point for all recording operations.
+/// Simple voice recorder for Flutter
 /// 
 /// Example:
 /// ```dart
-/// final manager = RecorderManager(
-///   config: RecorderConfig.voice(),
-///   onStateChanged: (state) => print('State: $state'),
-///   onError: (error) => print('Error: $error'),
-/// );
-/// 
-/// await manager.initialize();
-/// await manager.startRecording();
+/// final recorder = VoiceRecorder();
+/// await recorder.initialize();
+/// await recorder.start();
+/// final recording = await recorder.stop();
 /// ```
-class RecorderManager {
+class VoiceRecorder {
   /// Core recording service
-  final RecorderService _recorder;
+  final RecorderService _recorder = RecorderService();
   
   /// Audio session and interruption management
-  final AudioSessionService _audioSessionService;
+  final AudioSessionService _audioSessionService = AudioSessionService.instance;
   
   /// Waveform data management
-  final WaveDataManager _waveManager;
+  final WaveDataManager _waveManager = WaveDataManager.instance;
 
-  /// Recording configuration
-  final RecorderConfig config;
-
-  /// Storage configuration
-  final StorageConfig storageConfig;
+  /// Recording timer service for accurate duration tracking
+  final RecordingTimerService _timerService = RecordingTimerService();
 
   /// Callback for state changes
   final RecordingStateCallback? onStateChanged;
@@ -74,109 +59,99 @@ class RecorderManager {
   final StreamController<InterruptionData> _interruptionController =
       StreamController<InterruptionData>.broadcast();
 
-  /// Whether the manager has been disposed
+  /// Whether the recorder has been disposed
   bool _isDisposed = false;
 
-  /// Whether the manager is initialized
+  /// Whether the recorder is initialized
   bool _isInitialized = false;
 
-  /// Creates a RecorderManager with dependency injection
-  /// 
-  /// [config] - Recording configuration (quality, format, etc.)
-  /// [storageConfig] - Storage configuration (path, cleanup, etc.)
-  /// [onStateChanged] - Callback for state changes
-  /// [onError] - Callback for errors
-  /// [onInterruption] - Callback for interruptions
-  /// [recorder] - Optional recorder service for testing
-  /// [audioSessionService] - Optional audio session service for testing
-  /// [waveManager] - Optional wave manager for testing
-  RecorderManager({
-    RecorderConfig? config,
-    StorageConfig? storageConfig,
+  /// Creates a voice recorder
+  VoiceRecorder({
     this.onStateChanged,
     this.onError,
     this.onInterruption,
-    RecorderService? recorder,
-    AudioSessionService? audioSessionService,
-    WaveDataManager? waveManager,
-  })  : config = config ?? const RecorderConfig(),
-        storageConfig = storageConfig ?? const StorageConfig(),
-        _recorder = recorder ?? RecorderService(),
-        _audioSessionService = audioSessionService ?? AudioSessionService.instance,
-        _waveManager = waveManager ?? WaveDataManager.instance;
+  });
 
-  /// Stream of interruption events for the UI
-  /// 
-  /// Subscribe to this to handle interruptions (phone calls, headphone disconnect, etc.)
+  /// Interruption events (phone calls, headphones, etc.)
   Stream<InterruptionData> get interruptionStream => _interruptionController.stream;
 
-  /// Stream of amplitude data from the recorder
+  /// Real-time amplitude data for waveform visualization
   Stream<Amplitude> get amplitudeStream => _recorder.amplitudeStream;
   
-  /// Stream of state changes from the recorder
+  /// Recording state changes
   Stream<RecordState> get onRecordStateChanged => _recorder.onStateChanged;
 
-  /// Current recording state
+  /// Duration updates (excludes pause time)
+  Stream<Duration> get durationStream => _timerService.durationStream;
+
+  /// Current state
   RecordingState get recordingState {
     _checkDisposed();
     return _recorder.state;
   }
 
-  /// Whether currently recording
+  /// True if currently recording
   bool get isRecording {
     _checkDisposed();
     return _recorder.isRecording;
   }
 
-  /// Whether recording is paused
+  /// True if paused
   bool get isPaused {
     _checkDisposed();
     return _recorder.isPaused;
   }
 
-  /// Whether recording is stopped
+  /// True if stopped
   bool get isStopped {
     _checkDisposed();
     return _recorder.isStopped;
   }
 
-  /// Whether the manager is initialized
+  /// True if initialized
   bool get isInitialized => _isInitialized;
 
-  /// Whether the manager has been disposed
+  /// True if disposed
   bool get isDisposed => _isDisposed;
 
-  /// Current recording file name
+  /// Current file name
   String? get currentRecordingFileName {
     _checkDisposed();
     return _recorder.recordingFileName;
   }
 
-  /// Current recording full path
+  /// Current file path
   String? get currentRecordingFullPath {
     _checkDisposed();
     return _recorder.recordingFileFullPath;
   }
 
-  /// Whether waveform data is available
+  /// Current duration (excludes pause time). Null if not recording.
+  Duration? get currentDuration {
+    _checkDisposed();
+    if (!isRecording && !isPaused) return null;
+    return _timerService.currentDuration;
+  }
+
+  /// True if waveform data available
   bool get hasAmplitudeData {
     _checkDisposed();
     return _waveManager.hasData;
   }
 
-  /// Current waveform buffer
+  /// Waveform data for visualization
   List<double> get waveformBuffer {
     _checkDisposed();
     return _waveManager.currentBuffer;
   }
 
-  /// Waveform data manager (for direct access if needed)
+  /// Direct access to wave manager
   WaveDataManager get waveManager {
     _checkDisposed();
     return _waveManager;
   }
 
-  /// Checks if the manager has been disposed
+  /// Checks if the recorder has been disposed
   void _checkDisposed() {
     if (_isDisposed) {
       throw RecorderException.disposed();
@@ -190,32 +165,26 @@ class RecorderManager {
 
   /// Notifies error callback
   void _notifyError(RecorderException error) {
-    print('RecorderManager: Error - $error');
+    print('VoiceRecorder: Error - $error');
     onError?.call(error);
   }
 
-  /// Initializes all services
+  /// Initialize the recorder
   /// 
-  /// Must be called before any recording operations.
-  /// Initializes services in the correct order and sets up connections.
-  /// 
-  /// Returns true if initialization was successful.
-  /// Throws [RecorderException] if initialization fails.
+  /// Call this once before recording. Do it upfront (e.g., in initState)
+  /// to avoid delay when starting recording.
   Future<bool> initialize() async {
     _checkDisposed();
 
     if (_isInitialized) {
-      print('RecorderManager: Already initialized');
+      print('VoiceRecorder: Already initialized');
       return true;
     }
 
     try {
-      print('RecorderManager: Initializing...');
+      print('VoiceRecorder: Initializing...');
 
-      // 1. Initialize recorder with config
-      _recorder.updateConfig(config);
-      _recorder.updateStorageConfig(storageConfig);
-      
+      // 1. Initialize recorder
       final recorderInit = await _recorder.initialize();
       if (!recorderInit) {
         throw RecorderException.initializationFailed('Recorder initialization failed');
@@ -234,14 +203,14 @@ class RecorderManager {
       _setupStreamConnections();
 
       _isInitialized = true;
-      print('RecorderManager: Initialization complete');
+      print('VoiceRecorder: Initialization complete');
       return true;
     } catch (e, stackTrace) {
       final error = e is RecorderException 
           ? e 
           : RecorderException.initializationFailed(e);
       _notifyError(error);
-      print('RecorderManager: Initialization error - $e\n$stackTrace');
+      print('VoiceRecorder: Initialization error - $e\n$stackTrace');
       return false;
     }
   }
@@ -255,7 +224,7 @@ class RecorderManager {
         _waveManager.addAmplitude(decibels);
       },
       onError: (error) {
-        print('RecorderManager: Amplitude stream error - $error');
+        print('VoiceRecorder: Amplitude stream error - $error');
       },
     );
 
@@ -269,30 +238,58 @@ class RecorderManager {
         }
       },
       onError: (error) {
-        print('RecorderManager: Interruption stream error - $error');
+        print('VoiceRecorder: Interruption stream error - $error');
       },
     );
 
-    print('RecorderManager: Stream connections established');
+    print('VoiceRecorder: Stream connections established');
   }
 
-  /// Starts a new recording
+  /// Start recording
   /// 
-  /// This will:
-  /// 1. Configure audio session for recording
-  /// 2. Start the recorder
-  /// 3. Start waveform data collection
+  /// Simple: `await recorder.start()`
   /// 
-  /// Throws [RecorderException] if recording fails to start.
-  Future<void> startRecording() async {
+  /// With path: `await recorder.start(path: '/my/recordings')`
+  /// 
+  /// Advanced: `await recorder.start(config: RecorderConfig.highQuality())`
+  Future<void> start({
+    String? path,
+    RecorderConfig? config,
+    StorageConfig? storageConfig,
+  }) async {
     _checkDisposed();
 
     if (!_isInitialized) {
-      throw RecorderException.invalidState('Manager not initialized. Call initialize() first.');
+      throw RecorderException.invalidState('Recorder not initialized. Call initialize() first.');
     }
 
     try {
-      print('RecorderManager: Starting recording...');
+      print('VoiceRecorder: Starting recording...');
+
+      // Set recording config - defaults to voice quality
+      final recordConfig = config ?? const RecorderConfig();
+      _recorder.updateConfig(recordConfig);
+
+      // Handle storage config - prioritize simple path parameter
+      StorageConfig finalStorageConfig;
+      if (path != null) {
+        // User provided simple path - determine if it's a directory or file
+        if (path.endsWith('.m4a') || path.endsWith('.mp3') || path.endsWith('.wav') || path.endsWith('.aac')) {
+          // It's a full file path
+          finalStorageConfig = StorageConfig.withPath(path);
+        } else {
+          // It's a directory
+          finalStorageConfig = StorageConfig.withDirectory(path);
+        }
+      } else if (storageConfig != null) {
+        // User provided advanced storage config
+        finalStorageConfig = storageConfig;
+      } else {
+        // Use default (temp directory)
+        finalStorageConfig = const StorageConfig();
+      }
+      
+      _recorder.updateStorageConfig(finalStorageConfig);
 
       // 1. Configure audio session FIRST
       final audioConfigured = await _audioSessionService.configureForRecording();
@@ -306,23 +303,23 @@ class RecorderManager {
       // 3. Start wave data collection
       _waveManager.startRecording();
 
+      // 4. Start duration timer
+      _timerService.start();
+
       _notifyStateChange(RecordingState.recording);
-      print('RecorderManager: Recording started successfully');
+      print('VoiceRecorder: Recording started successfully');
     } catch (e, stackTrace) {
       final error = e is RecorderException 
           ? e 
           : RecorderException.recordingFailed(e);
       _notifyError(error);
-      print('RecorderManager: Start recording error - $e\n$stackTrace');
+      print('VoiceRecorder: Start recording error - $e\n$stackTrace');
       rethrow;
     }
   }
 
-  /// Pauses the current recording
-  /// 
-  /// Recording can be resumed later from the same point.
-  /// Throws [RecorderException] if pause fails.
-  Future<void> pauseRecording() async {
+  /// Pause recording (pause time not included in duration)
+  Future<void> pause() async {
     _checkDisposed();
 
     if (!isRecording) {
@@ -330,28 +327,26 @@ class RecorderManager {
     }
 
     try {
-      print('RecorderManager: Pausing recording...');
+      print('VoiceRecorder: Pausing recording...');
 
       await _recorder.pauseRecording();
       _waveManager.pauseRecording();
+      _timerService.pause();
 
       _notifyStateChange(RecordingState.paused);
-      print('RecorderManager: Recording paused');
+      print('VoiceRecorder: Recording paused');
     } catch (e, stackTrace) {
       final error = e is RecorderException 
           ? e 
           : RecorderException.recordingFailed(e);
       _notifyError(error);
-      print('RecorderManager: Pause recording error - $e\n$stackTrace');
+      print('VoiceRecorder: Pause recording error - $e\n$stackTrace');
       rethrow;
     }
   }
 
-  /// Resumes a paused recording
-  /// 
-  /// Continues recording from where it was paused.
-  /// Throws [RecorderException] if resume fails.
-  Future<void> resumeRecording() async {
+  /// Resume recording
+  Future<void> resume() async {
     _checkDisposed();
 
     if (!isPaused) {
@@ -359,7 +354,7 @@ class RecorderManager {
     }
 
     try {
-      print('RecorderManager: Resuming recording...');
+      print('VoiceRecorder: Resuming recording...');
 
       // Configure audio session
       final audioConfigured = await _audioSessionService.configureForRecording();
@@ -369,24 +364,22 @@ class RecorderManager {
 
       await _recorder.resumeRecording();
       _waveManager.resumeRecording();
+      _timerService.resume();
 
       _notifyStateChange(RecordingState.recording);
-      print('RecorderManager: Recording resumed');
+      print('VoiceRecorder: Recording resumed');
     } catch (e, stackTrace) {
       final error = e is RecorderException 
           ? e 
           : RecorderException.recordingFailed(e);
       _notifyError(error);
-      print('RecorderManager: Resume recording error - $e\n$stackTrace');
+      print('VoiceRecorder: Resume recording error - $e\n$stackTrace');
       rethrow;
     }
   }
 
-  /// Stops the recording and saves the file
-  /// 
-  /// Returns a tuple of (File, DateTime) with the saved file and timestamp.
-  /// Throws [RecorderException] if stopping fails or file is not found.
-  Future<(File, DateTime)> stopRecording() async {
+  /// Stop recording and get Recording object with path, duration, size
+  Future<Recording> stop() async {
     _checkDisposed();
 
     if (!isRecording && !isPaused) {
@@ -394,7 +387,10 @@ class RecorderManager {
     }
 
     try {
-      print('RecorderManager: Stopping recording...');
+      print('VoiceRecorder: Stopping recording...');
+
+      // Stop timer and get accurate duration (excluding pause time)
+      final duration = _timerService.stop();
 
       final file = await _recorder.stopRecording();
       _waveManager.stopRecording();
@@ -405,101 +401,108 @@ class RecorderManager {
 
       await _audioSessionService.reset();
 
+      // Get file size
+      final sizeInBytes = await file.length();
       final timestamp = DateTime.now();
+
       _notifyStateChange(RecordingState.stopped);
-      print('RecorderManager: Recording stopped - ${file.path}');
+      print('VoiceRecorder: Recording stopped - ${file.path} (${duration.inSeconds}s, $sizeInBytes bytes)');
       
-      return (file, timestamp);
+      return Recording(
+        path: file.path,
+        file: file,
+        duration: duration,
+        sizeInBytes: sizeInBytes,
+        timestamp: timestamp,
+      );
     } catch (e, stackTrace) {
       final error = e is RecorderException 
           ? e 
           : RecorderException.recordingFailed(e);
       _notifyError(error);
-      print('RecorderManager: Stop recording error - $e\n$stackTrace');
+      print('VoiceRecorder: Stop recording error - $e\n$stackTrace');
       rethrow;
     }
   }
 
-  /// Deletes the current recording
-  /// 
-  /// Stops the recording if active and deletes the file.
-  /// Throws [RecorderException] if deletion fails.
-  Future<void> deleteRecording() async {
+  /// Delete current recording
+  Future<void> delete() async {
     _checkDisposed();
 
     try {
-      print('RecorderManager: Deleting recording...');
+      print('VoiceRecorder: Deleting recording...');
+
+      // Stop timer if running
+      if (isRecording || isPaused) {
+        _timerService.stop();
+      }
 
       await _recorder.deleteRecording();
       _waveManager.clearData();
       await _audioSessionService.reset();
 
       _notifyStateChange(RecordingState.idle);
-      print('RecorderManager: Recording deleted');
+      print('VoiceRecorder: Recording deleted');
     } catch (e, stackTrace) {
       final error = e is RecorderException 
           ? e 
           : RecorderException.storageError(e);
       _notifyError(error);
-      print('RecorderManager: Delete recording error - $e\n$stackTrace');
+      print('VoiceRecorder: Delete recording error - $e\n$stackTrace');
       rethrow;
     }
   }
 
-  /// Restarts the recording
-  /// 
-  /// Stops the current recording and starts a new one.
-  /// Returns the timestamp when the new recording started.
-  /// Throws [RecorderException] if restart fails.
-  Future<DateTime> restartRecording() async {
+  /// Restart recording (stops current and starts new)
+  Future<void> restart() async {
     _checkDisposed();
 
     try {
-      print('RecorderManager: Restarting recording...');
+      print('VoiceRecorder: Restarting recording...');
+
+      // Stop timer
+      _timerService.stop();
 
       await _recorder.restartRecording();
       _waveManager.clearData();
       _waveManager.startRecording();
 
-      final timestamp = DateTime.now();
+      // Start new timer
+      _timerService.start();
+
       _notifyStateChange(RecordingState.recording);
-      print('RecorderManager: Recording restarted');
-      
-      return timestamp;
+      print('VoiceRecorder: Recording restarted');
     } catch (e, stackTrace) {
       final error = e is RecorderException 
           ? e 
           : RecorderException.recordingFailed(e);
       _notifyError(error);
-      print('RecorderManager: Restart recording error - $e\n$stackTrace');
+      print('VoiceRecorder: Restart recording error - $e\n$stackTrace');
       rethrow;
     }
   }
 
-  /// Checks if audio focus is available
-  /// 
-  /// Returns true if the app can access the microphone.
+  /// Check if microphone is available
   Future<bool> checkAudioFocusAvailable() async {
     _checkDisposed();
 
     try {
       return await _recorder.initialize();
     } catch (e) {
-      print('RecorderManager: Audio focus check error - $e');
+      print('VoiceRecorder: Audio focus check error - $e');
       return false;
     }
   }
 
-  /// Resets the manager to initial state
-  /// 
-  /// Stops any active recording and clears all data.
+  /// Reset to initial state
   Future<void> reset() async {
     _checkDisposed();
 
     try {
-      print('RecorderManager: Resetting...');
+      print('VoiceRecorder: Resetting...');
 
       if (isRecording || isPaused) {
+        _timerService.stop();
         await _recorder.stopRecording();
       }
 
@@ -507,23 +510,20 @@ class RecorderManager {
       await _audioSessionService.reset();
 
       _notifyStateChange(RecordingState.idle);
-      print('RecorderManager: Reset complete');
+      print('VoiceRecorder: Reset complete');
     } catch (e) {
-      print('RecorderManager: Reset error - $e');
+      print('VoiceRecorder: Reset error - $e');
     }
   }
 
-  /// Disposes the manager and all services
-  /// 
-  /// Must be called when the manager is no longer needed.
-  /// Cleans up all resources and cancels subscriptions.
+  /// Clean up resources (call when done)
   Future<void> dispose() async {
     if (_isDisposed) {
       return;
     }
 
     try {
-      print('RecorderManager: Disposing...');
+      print('VoiceRecorder: Disposing...');
 
       // Cancel subscriptions
       await _amplitudeSubscription?.cancel();
@@ -532,14 +532,15 @@ class RecorderManager {
 
       // Dispose services
       await _recorder.dispose();
+      await _timerService.dispose();
       _audioSessionService.reset();
       _waveManager.clearData();
 
       _isDisposed = true;
       _isInitialized = false;
-      print('RecorderManager: Disposed');
+      print('VoiceRecorder: Disposed');
     } catch (e) {
-      print('RecorderManager: Dispose error - $e');
+      print('VoiceRecorder: Dispose error - $e');
     }
   }
 }

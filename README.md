@@ -3,258 +3,212 @@
 [![pub package](https://img.shields.io/pub/v/voice_recorder.svg)](https://pub.dev/packages/voice_recorder)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A comprehensive audio recording package for Flutter with real-time waveform visualization, automatic interruption handling, and flexible configuration options.
+Simple, powerful audio recording for Flutter. Record high-quality audio with just a few lines of code.
 
-## Features
+## ✨ Features
 
-- 🎙️ **High-Quality Audio Recording** - Multiple quality presets and custom configuration
-- 📊 **Real-Time Waveform Visualization** - Live amplitude data for visual feedback
-- ⏸️ **Pause/Resume Support** - Full control over recording lifecycle
-- 📞 **Automatic Interruption Handling** - Handles phone calls, headphone disconnections, and more
-- ⚙️ **Flexible Configuration** - Quality presets and custom settings
-- 💾 **Configurable Storage** - Choose where and how recordings are saved
-- 🏗️ **Clean Architecture** - Well-structured, testable, and maintainable code
-- 🔒 **Production Ready** - Comprehensive error handling and state management
+- 🎙️ **Simple API** - Start recording in 3 lines of code
+- 📊 **Waveform Visualization** - Real-time audio amplitude data
+- ⏸️ **Pause/Resume** - Full recording control
+- ⏱️ **Accurate Duration** - Excludes pause time automatically
+- 📞 **Interruption Handling** - Handles phone calls, headphones, etc.
+- ⚙️ **Flexible Configuration** - Simple defaults, advanced when needed
+- 💾 **Easy Storage** - Simple path or full control
+- 🏗️ **Production Ready** - Comprehensive error handling
 
-## Installation
-
-Add this to your package's `pubspec.yaml` file:
+## 📦 Installation
 
 ```yaml
 dependencies:
   voice_recorder: ^0.1.0
 ```
 
-Then run:
-
 ```bash
 flutter pub get
 ```
 
-## Platform Setup
-
-### Android
-
-Add the following permissions to `android/app/src/main/AndroidManifest.xml`:
-
-```xml
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
-                     android:maxSdkVersion="28" />
-    
-    <application ...>
-        ...
-    </application>
-</manifest>
-```
-
-### iOS
-
-Add the following to `ios/Runner/Info.plist`:
-
-```xml
-<key>NSMicrophoneUsageDescription</key>
-<string>This app needs microphone access to record audio</string>
-```
-
-## Quick Start
+## 🚀 Quick Start
 
 ```dart
 import 'package:voice_recorder/voice_recorder.dart';
 
-// Create recorder instance
-final recorder = RecorderManager(
-  config: RecorderConfig.voice(),
-  onStateChanged: (state) {
-    print('Recording state: $state');
-  },
-  onError: (error) {
-    print('Error: ${error.message}');
-  },
+// Create recorder
+final recorder = VoiceRecorder();
+
+// Initialize once (upfront, no delay later)
+await recorder.initialize();
+
+// Start recording
+await recorder.start();
+
+// Stop and get info
+final recording = await recorder.stop();
+print('Duration: ${recording.duration.inSeconds}s');
+print('Size: ${recording.sizeInBytes} bytes');
+print('Path: ${recording.path}');
+```
+
+That's it! 🎉
+
+## 🔧 Platform Setup
+
+### Android
+
+Add to `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
+                 android:maxSdkVersion="28" />
+```
+
+### iOS
+
+Add to `ios/Runner/Info.plist`:
+
+```xml
+<key>NSMicrophoneUsageDescription</key>
+<string>We need microphone access to record audio</string>
+```
+
+## 📖 Usage
+
+### Basic Recording
+
+```dart
+// Create recorder
+final recorder = VoiceRecorder(
+  onStateChanged: (state) => print('State: $state'),
+  onError: (error) => print('Error: $error'),
 );
 
 // Initialize
 await recorder.initialize();
 
-// Start recording
-await recorder.startRecording();
+// Start
+await recorder.start();
 
-// Pause recording
-await recorder.pauseRecording();
+// Pause
+await recorder.pause();
 
-// Resume recording
-await recorder.resumeRecording();
+// Resume
+await recorder.resume();
 
-// Stop and get file
-final (file, timestamp) = await recorder.stopRecording();
-print('Recording saved: ${file.path}');
+// Stop
+final recording = await recorder.stop();
 
 // Clean up
 await recorder.dispose();
 ```
 
-## Configuration
-
-### Quality Presets
-
-Choose from predefined quality presets:
+### Custom Path
 
 ```dart
-// Low quality - 64 kbps, 22.05 kHz (smallest file size)
-RecorderConfig.lowQuality()
+// Save to specific directory
+await recorder.start(path: '/my/recordings');
 
-// Medium quality - 128 kbps, 44.1 kHz (balanced)
-RecorderConfig.mediumQuality()
-
-// High quality - 256 kbps, 48 kHz (best quality)
-RecorderConfig.highQuality()
-
-// Voice optimized - 96 kbps, 44.1 kHz (recommended for voice)
-RecorderConfig.voice()
+// Save with specific filename
+await recorder.start(path: '/my/recordings/interview.m4a');
 ```
 
-### Custom Configuration
-
-Create custom recording configuration:
+### Quality Settings
 
 ```dart
-final config = RecorderConfig(
-  encoder: AudioEncoder.aacLc,
-  bitRate: 128000,
-  sampleRate: 44100,
-  numChannels: 1,
-  autoGain: true,
-  echoCancel: true,
-  noiseSuppress: true,
-  filePrefix: 'my_recording',
-  fileExtension: 'm4a',
+// High quality
+await recorder.start(
+  config: RecorderConfig.highQuality(),
 );
 
-final recorder = RecorderManager(config: config);
+// Voice optimized (default)
+await recorder.start(
+  config: RecorderConfig.voice(),
+);
+
+// Custom settings
+await recorder.start(
+  config: RecorderConfig(
+    encoder: AudioEncoder.aacLc,
+    bitRate: 128000,
+    sampleRate: 44100,
+  ),
+);
 ```
 
-### Storage Configuration
-
-Control where recordings are saved:
+### Advanced Storage
 
 ```dart
-// Use temporary directory (default)
-StorageConfig.tempDirectory()
-
 // Use app documents directory
-StorageConfig.visible()
+await recorder.start(
+  storageConfig: StorageConfig.visible(),
+);
 
 // Custom directory
-StorageConfig.withDirectory('/path/to/directory')
+await recorder.start(
+  storageConfig: StorageConfig.withDirectory('/custom/path'),
+);
 
-// Specific file path
-StorageConfig.withPath('/path/to/file.m4a')
-
-// Custom naming
-StorageConfig.withCustomNaming(
-  prefix: 'voice_note',
-  extension: 'm4a',
-)
+// Full control
+await recorder.start(
+  config: RecorderConfig.highQuality(),
+  storageConfig: StorageConfig.visible(),
+);
 ```
 
-## Waveform Visualization
-
-Access real-time amplitude data for waveform visualization:
+## 📊 Waveform Visualization
 
 ```dart
-// Listen to amplitude stream
+// Listen to amplitude updates
 recorder.amplitudeStream.listen((amplitude) {
-  print('Current amplitude: ${amplitude.current} dB');
+  print('Amplitude: ${amplitude.current} dB');
 });
 
 // Get waveform buffer
 List<double> waveform = recorder.waveformBuffer;
 
-// Check if data is available
-bool hasData = recorder.hasAmplitudeData;
-
-// Access wave manager directly
-final waveManager = recorder.waveManager;
-waveManager.waveformStream.listen((buffer) {
-  // Update UI with waveform data
-});
+// Use in CustomPainter
+CustomPaint(
+  painter: WaveformPainter(recorder.waveformBuffer),
+)
 ```
 
-## Interruption Handling
-
-Automatically handle audio interruptions:
+## ⏱️ Duration Tracking
 
 ```dart
-final recorder = RecorderManager(
+// Get current duration while recording
+Duration? duration = recorder.currentDuration;
+
+// Listen to duration updates
+recorder.durationStream.listen((duration) {
+  print('Recording: ${duration.inSeconds}s');
+});
+
+// Duration in Recording object (excludes pause time)
+final recording = await recorder.stop();
+print('Total: ${recording.duration.inSeconds}s');
+```
+
+## 📞 Interruption Handling
+
+```dart
+final recorder = VoiceRecorder(
   onInterruption: (interruption) {
-    print('Interrupted by: ${interruption.type}');
-    
-    if (interruption.shouldPause) {
-      // Recording was automatically paused
-      showNotification('Recording paused due to ${interruption.type}');
-    }
+    print('Interrupted: ${interruption.type}');
   },
 );
 
-// Listen to interruption stream
+// Or listen to stream
 recorder.interruptionStream.listen((interruption) {
-  switch (interruption.type) {
-    case InterruptionType.phoneCall:
-      // Handle phone call
-      break;
-    case InterruptionType.headphoneDisconnect:
-      // Handle headphone disconnect
-      break;
-    // ... other cases
+  if (interruption.type == InterruptionType.phoneCall) {
+    // Handle phone call
   }
 });
 ```
 
-Supported interruption types:
-- Phone calls (regular and VoIP)
-- Media playback from other apps
-- Headphone/Bluetooth disconnection
-- Audio ducking (navigation, alarms)
-- System audio route changes
-
-## Error Handling
-
-Comprehensive error handling with specific error types:
-
-```dart
-try {
-  await recorder.startRecording();
-} on RecorderException catch (e) {
-  switch (e.type) {
-    case RecorderErrorType.permissionDenied:
-      // Request permissions
-      break;
-    case RecorderErrorType.initializationFailed:
-      // Handle initialization error
-      break;
-    case RecorderErrorType.recordingFailed:
-      // Handle recording error
-      break;
-    case RecorderErrorType.storageError:
-      // Handle storage error
-      break;
-    default:
-      // Handle other errors
-  }
-  
-  print('Error: ${e.message}');
-  if (e.originalError != null) {
-    print('Original error: ${e.originalError}');
-  }
-}
-```
-
-## Complete Example
+## 🎯 Complete Example
 
 ```dart
 import 'package:flutter/material.dart';
-import 'package:recorder/recorder.dart';
+import 'package:voice_recorder/voice_recorder.dart';
 
 class RecordingScreen extends StatefulWidget {
   @override
@@ -262,82 +216,58 @@ class RecordingScreen extends StatefulWidget {
 }
 
 class _RecordingScreenState extends State<RecordingScreen> {
-  late RecorderManager _recorder;
-  RecordingState _state = RecordingState.idle;
-  String? _errorMessage;
+  late VoiceRecorder recorder;
+  RecordingState state = RecordingState.idle;
 
   @override
   void initState() {
     super.initState();
-    _initializeRecorder();
-  }
-
-  void _initializeRecorder() {
-    _recorder = RecorderManager(
-      config: RecorderConfig.voice(),
-      storageConfig: StorageConfig.visible(),
-      onStateChanged: (state) {
-        setState(() => _state = state);
-      },
-      onError: (error) {
-        setState(() => _errorMessage = error.message);
-      },
-      onInterruption: (interruption) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Interrupted: ${interruption.type.name}')),
-        );
-      },
+    recorder = VoiceRecorder(
+      onStateChanged: (s) => setState(() => state = s),
+      onError: (e) => print('Error: $e'),
     );
-    
-    _recorder.initialize();
+    recorder.initialize();
   }
 
   @override
   void dispose() {
-    _recorder.dispose();
+    recorder.dispose();
     super.dispose();
-  }
-
-  Future<void> _startRecording() async {
-    try {
-      await _recorder.startRecording();
-    } catch (e) {
-      // Error handled by callback
-    }
-  }
-
-  Future<void> _stopRecording() async {
-    try {
-      final (file, timestamp) = await _recorder.stopRecording();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved: ${file.path}')),
-      );
-    } catch (e) {
-      // Error handled by callback
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Recorder')),
+      appBar: AppBar(title: Text('Voice Recorder')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('State: ${_state.name}'),
-            if (_errorMessage != null)
-              Text('Error: $_errorMessage', style: TextStyle(color: Colors.red)),
+            Text('State: ${state.name}'),
             SizedBox(height: 20),
-            if (_state == RecordingState.idle)
+            if (state == RecordingState.idle)
               ElevatedButton(
-                onPressed: _startRecording,
-                child: Text('Start Recording'),
+                onPressed: () => recorder.start(),
+                child: Text('Start'),
               ),
-            if (_state == RecordingState.recording)
+            if (state == RecordingState.recording)
               ElevatedButton(
-                onPressed: _stopRecording,
-                child: Text('Stop Recording'),
+                onPressed: () => recorder.pause(),
+                child: Text('Pause'),
+              ),
+            if (state == RecordingState.paused)
+              ElevatedButton(
+                onPressed: () => recorder.resume(),
+                child: Text('Resume'),
+              ),
+            if (state == RecordingState.recording || 
+                state == RecordingState.paused)
+              ElevatedButton(
+                onPressed: () async {
+                  final recording = await recorder.stop();
+                  print('Saved: ${recording.path}');
+                },
+                child: Text('Stop'),
               ),
           ],
         ),
@@ -347,124 +277,125 @@ class _RecordingScreenState extends State<RecordingScreen> {
 }
 ```
 
-## API Reference
+## 📚 API Reference
 
-### RecorderManager
+### VoiceRecorder
 
-Main class for managing audio recordings.
+Main class for audio recording.
 
-#### Constructor
-
+**Constructor:**
 ```dart
-RecorderManager({
-  RecorderConfig? config,
-  StorageConfig? storageConfig,
+VoiceRecorder({
   RecordingStateCallback? onStateChanged,
   ErrorCallback? onError,
   InterruptionCallback? onInterruption,
 })
 ```
 
-#### Methods
+**Methods:**
+- `initialize()` - Initialize recorder (call once)
+- `start({path, config, storageConfig})` - Start recording
+- `pause()` - Pause recording
+- `resume()` - Resume recording
+- `stop()` - Stop and get Recording object
+- `delete()` - Delete current recording
+- `restart()` - Restart recording
+- `dispose()` - Clean up resources
 
-- `Future<bool> initialize()` - Initialize the recorder
-- `Future<void> startRecording()` - Start recording
-- `Future<void> pauseRecording()` - Pause recording
-- `Future<void> resumeRecording()` - Resume recording
-- `Future<(File, DateTime)> stopRecording()` - Stop and save recording
-- `Future<void> deleteRecording()` - Delete current recording
-- `Future<DateTime> restartRecording()` - Restart recording
-- `Future<void> reset()` - Reset to initial state
-- `Future<void> dispose()` - Clean up resources
+**Properties:**
+- `isRecording` - Currently recording
+- `isPaused` - Currently paused
+- `currentDuration` - Current duration (excludes pause)
+- `currentRecordingFullPath` - Current file path
+- `waveformBuffer` - Waveform data
+- `amplitudeStream` - Amplitude updates
+- `durationStream` - Duration updates
 
-#### Properties
+### Recording
 
-- `RecordingState recordingState` - Current state
-- `bool isRecording` - Whether recording
-- `bool isPaused` - Whether paused
-- `bool isStopped` - Whether stopped
-- `bool isInitialized` - Whether initialized
-- `String? currentRecordingFileName` - Current file name
-- `String? currentRecordingFullPath` - Current file path
-- `List<double> waveformBuffer` - Waveform data
-- `Stream<Amplitude> amplitudeStream` - Amplitude stream
-- `Stream<InterruptionData> interruptionStream` - Interruption stream
+Recording metadata returned by `stop()`.
 
-## Permissions
+**Properties:**
+- `path` - Full file path
+- `file` - File object
+- `duration` - Recording duration (excludes pause time)
+- `sizeInBytes` - File size in bytes
+- `timestamp` - When recording stopped
+- `fileName` - File name only
 
-The package requires microphone permissions. Use the `permission_handler` package (already included) to request permissions:
+### RecorderConfig
+
+Recording quality configuration.
+
+**Presets:**
+- `RecorderConfig.voice()` - Voice optimized (default)
+- `RecorderConfig.highQuality()` - High quality
+- `RecorderConfig.mediumQuality()` - Medium quality
+- `RecorderConfig.lowQuality()` - Low quality
+
+**Custom:**
+```dart
+RecorderConfig(
+  encoder: AudioEncoder.aacLc,
+  bitRate: 128000,
+  sampleRate: 44100,
+  numChannels: 1,
+)
+```
+
+### StorageConfig
+
+Storage location configuration.
+
+**Options:**
+- `StorageConfig()` - Default (temp directory)
+- `StorageConfig.visible()` - App documents
+- `StorageConfig.withDirectory(path)` - Custom directory
+- `StorageConfig.withPath(path)` - Specific file path
+
+## 🔐 Permissions
+
+Request microphone permission before recording:
 
 ```dart
 import 'package:permission_handler/permission_handler.dart';
 
-Future<bool> requestPermissions() async {
-  final status = await Permission.microphone.request();
-  return status.isGranted;
+final status = await Permission.microphone.request();
+if (status.isGranted) {
+  await recorder.start();
 }
 ```
 
-## Testing
+## ❓ Troubleshooting
 
-The package includes comprehensive tests. Run them with:
+**Permission denied?**
+- Add platform permissions (see Platform Setup)
+- Request permission at runtime
 
-```bash
-flutter test
-```
+**Recording not starting?**
+- Call `initialize()` first
+- Check microphone permission
 
-## Example App
+**File not found?**
+- Check storage configuration
+- Ensure write permissions
 
-A complete example app is included in the `example/` directory. Run it with:
+## 🤝 Contributing
 
-```bash
-cd example
-flutter run
-```
+Contributions welcome! Please open an issue or submit a PR.
 
-## Troubleshooting
+## 📄 License
 
-### Permission Denied
+MIT License - see [LICENSE](LICENSE) file.
 
-Make sure you've added the required permissions to your platform-specific configuration files and requested them at runtime.
+## 🙏 Credits
 
-### Recording Not Starting
+Built with:
+- [record](https://pub.dev/packages/record)
+- [audio_session](https://pub.dev/packages/audio_session)
+- [permission_handler](https://pub.dev/packages/permission_handler)
+- [path_provider](https://pub.dev/packages/path_provider)
 
-Ensure you've called `initialize()` before starting recording:
+---
 
-```dart
-await recorder.initialize();
-await recorder.startRecording();
-```
-
-### File Not Found
-
-Check your storage configuration and ensure the app has write permissions for the specified directory.
-
-### Interruptions Not Working
-
-Make sure you've initialized the audio session by calling `initialize()` on the RecorderManager.
-
-## Contributing
-
-Contributions are welcome! Please read our contributing guidelines and submit pull requests to our repository.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-- 📧 Email: support@example.com
-- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/recorder/issues)
-- 📖 Documentation: [GitHub Wiki](https://github.com/yourusername/recorder/wiki)
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for a list of changes in each version.
-
-## Credits
-
-Built with ❤️ using:
-- [record](https://pub.dev/packages/record) - Audio recording
-- [audio_session](https://pub.dev/packages/audio_session) - Audio session management
-- [permission_handler](https://pub.dev/packages/permission_handler) - Permission handling
-- [path_provider](https://pub.dev/packages/path_provider) - File path management
+Made with ❤️ for the Flutter community

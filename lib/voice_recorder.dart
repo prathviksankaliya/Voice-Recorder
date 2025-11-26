@@ -17,21 +17,23 @@
 /// ```dart
 /// import 'package:voice_recorder/voice_recorder.dart';
 /// 
-/// // Create a recorder manager
-/// final recorder = RecorderManager(
-///   config: RecorderConfig.voice(),
+/// // Create a voice recorder
+/// final recorder = VoiceRecorder(
 ///   onStateChanged: (state) => print('State: $state'),
 ///   onError: (error) => print('Error: $error'),
 /// );
 /// 
-/// // Initialize
+/// // Initialize (do this once, upfront)
 /// await recorder.initialize();
 /// 
-/// // Start recording
-/// await recorder.startRecording();
+/// // Start recording (fast, no delay!)
+/// await recorder.start();
 /// 
-/// // Stop and get file
-/// final (file, timestamp) = await recorder.stopRecording();
+/// // Stop and get recording info
+/// final recording = await recorder.stop();
+/// print('Path: ${recording.path}');
+/// print('Duration: ${recording.duration.inSeconds}s');
+/// print('Size: ${recording.sizeInBytes} bytes');
 /// ```
 /// 
 /// ## Configuration
@@ -58,7 +60,7 @@
 library;
 
 // Core manager
-export 'src/manager/recorder_manager.dart';
+export 'src/manager/voice_recorder.dart';
 
 // Configuration
 export 'src/config/recorder_config.dart';
@@ -66,6 +68,7 @@ export 'src/config/storage_config.dart';
 
 // Models
 export 'src/models/interruption_data.dart';
+export 'src/models/recording.dart';
 
 // Enums
 export 'src/enums/enums.dart';

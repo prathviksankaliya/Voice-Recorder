@@ -11,7 +11,7 @@ class RecorderExampleApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Recorder Example',
+      title: 'Voice Recorder Example',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -41,11 +41,12 @@ class RecorderExampleScreen extends StatefulWidget {
 }
 
 class _RecorderExampleScreenState extends State<RecorderExampleScreen> {
-  late RecorderManager _recorder;
+  late VoiceRecorder _recorder;
   RecordingState _state = RecordingState.idle;
   String? _errorMessage;
   String? _fileName;
   List<double> _waveform = [];
+  Duration _currentDuration = Duration.zero;
 
   @override
   void initState() {
@@ -54,9 +55,7 @@ class _RecorderExampleScreenState extends State<RecorderExampleScreen> {
   }
 
   void _initializeRecorder() {
-    _recorder = RecorderManager(
-      config: RecorderConfig.voice(),
-      storageConfig: StorageConfig.visible(),
+    _recorder = VoiceRecorder(
       onStateChanged: (state) {
         setState(() {
           _state = state;
@@ -81,12 +80,20 @@ class _RecorderExampleScreenState extends State<RecorderExampleScreen> {
       },
     );
 
+    // Initialize upfront (do heavy work here, no delay later)
     _recorder.initialize();
 
     // Listen to waveform updates
     _recorder.amplitudeStream.listen((amplitude) {
       setState(() {
         _waveform = _recorder.waveformBuffer;
+      });
+    });
+
+    // Listen to duration updates
+    _recorder.durationStream.listen((duration) {
+      setState(() {
+        _currentDuration = duration;
       });
     });
   }
@@ -99,7 +106,17 @@ class _RecorderExampleScreenState extends State<RecorderExampleScreen> {
 
   Future<void> _startRecording() async {
     try {
-      await _recorder.startRecording();
+      // Simple usage - just start!
+      // await _recorder.start();
+      
+      // Or with custom path
+      // await _recorder.start(path: '/custom/directory');
+      
+      // Or with advanced config
+      await _recorder.start(
+        config: RecorderConfig.voice(),
+        storageConfig: StorageConfig.visible(),
+      );
     } catch (e) {
       // Error handled by callback
     }
@@ -107,7 +124,7 @@ class _RecorderExampleScreenState extends State<RecorderExampleScreen> {
 
   Future<void> _pauseRecording() async {
     try {
-      await _recorder.pauseRecording();
+      await _recorder.pause();
     } catch (e) {
       // Error handled by callback
     }
@@ -115,7 +132,7 @@ class _RecorderExampleScreenState extends State<RecorderExampleScreen> {
 
   Future<void> _resumeRecording() async {
     try {
-      await _recorder.resumeRecording();
+      await _recorder.resume();
     } catch (e) {
       // Error handled by callback
     }
@@ -123,13 +140,21 @@ class _RecorderExampleScreenState extends State<RecorderExampleScreen> {
 
   Future<void> _stopRecording() async {
     try {
-      final (file, timestamp) = await _recorder.stopRecording();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Recording saved: ${file.path}'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      final recording = await _recorder.stop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Recording saved!\n'
+              'Duration: ${recording.duration.inSeconds}s\n'
+              'Size: ${recording.sizeInBytes} bytes\n'
+              'Path: ${recording.fileName}',
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     } catch (e) {
       // Error handled by callback
     }
@@ -137,23 +162,31 @@ class _RecorderExampleScreenState extends State<RecorderExampleScreen> {
 
   Future<void> _deleteRecording() async {
     try {
-      await _recorder.deleteRecording();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Recording deleted'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      await _recorder.delete();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Recording deleted'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } catch (e) {
       // Error handled by callback
     }
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes.toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Recorder Example'),
+        title: const Text('Voice Recorder Example'),
         centerTitle: true,
       ),
       body: Column(
@@ -216,6 +249,19 @@ class _RecorderExampleScreenState extends State<RecorderExampleScreen> {
               ),
             ),
           ),
+
+          // Duration display
+          if (_state == RecordingState.recording || _state == RecordingState.paused)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                _formatDuration(_currentDuration),
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontFeatures: [const FontFeature.tabularFigures()],
+                    ),
+              ),
+            ),
 
           // State indicator
           Padding(
