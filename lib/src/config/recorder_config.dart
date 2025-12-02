@@ -1,42 +1,43 @@
 import 'package:record/record.dart';
 
-/// Configuration for the audio recorder
+/// Audio recording configuration.
 /// 
-/// Provides customizable settings for recording quality, format, and behavior.
-/// Use predefined presets or create custom configurations.
+/// **Use Presets**:
+/// RecorderConfig.voice()         // Voice optimized
+/// RecorderConfig.lowQuality()    // Smallest files
+/// RecorderConfig.mediumQuality() // Balanced
+/// RecorderConfig.highQuality()   // Best quality
+/// ```
 class RecorderConfig {
-  /// Audio encoder to use
+  /// Audio encoder
   final AudioEncoder encoder;
   
-  /// Bit rate in bits per second (e.g., 128000 for 128 kbps)
+  /// Bit rate (e.g., 128000 = 128 kbps)
   final int bitRate;
   
-  /// Sample rate in Hz (e.g., 44100 for CD quality)
+  /// Sample rate (e.g., 44100 Hz)
   final int sampleRate;
   
-  /// Number of audio channels (1 for mono, 2 for stereo)
+  /// Channels (1 = mono, 2 = stereo)
   final int numChannels;
   
-  /// Enable automatic gain control
+  /// Auto gain control
   final bool autoGain;
   
-  /// Enable echo cancellation
+  /// Echo cancellation
   final bool echoCancel;
   
-  /// Enable noise suppression
+  /// Noise suppression
   final bool noiseSuppress;
   
-  /// Prefix for recording filenames
+  /// Filename prefix
   final String filePrefix;
   
-  /// File extension (without dot)
+  /// File extension
   final String fileExtension;
   
-  /// Android-specific configuration
+  /// Android config (optional)
   final AndroidRecorderConfig? androidConfig;
-  
-  /// iOS-specific configuration
-  final IOSRecorderConfig? iosConfig;
 
   const RecorderConfig({
     this.encoder = AudioEncoder.aacLc,
@@ -49,7 +50,6 @@ class RecorderConfig {
     this.filePrefix = 'recording',
     this.fileExtension = 'm4a',
     this.androidConfig,
-    this.iosConfig,
   });
 
   /// Low quality preset (64 kbps, 22.05 kHz)
@@ -126,7 +126,6 @@ class RecorderConfig {
     String? filePrefix,
     String? fileExtension,
     AndroidRecorderConfig? androidConfig,
-    IOSRecorderConfig? iosConfig,
   }) {
     return RecorderConfig(
       encoder: encoder ?? this.encoder,
@@ -139,7 +138,6 @@ class RecorderConfig {
       filePrefix: filePrefix ?? this.filePrefix,
       fileExtension: fileExtension ?? this.fileExtension,
       androidConfig: androidConfig ?? this.androidConfig,
-      iosConfig: iosConfig ?? this.iosConfig,
     );
   }
 }
@@ -198,18 +196,4 @@ class AndroidServiceConfig {
       content: content,
     );
   }
-}
-
-/// iOS-specific recorder configuration
-class IOSRecorderConfig {
-  /// Audio quality
-  final int audioQuality;
-  
-  /// Enable background recording
-  final bool backgroundRecording;
-
-  const IOSRecorderConfig({
-    this.audioQuality = 127,
-    this.backgroundRecording = false,
-  });
 }

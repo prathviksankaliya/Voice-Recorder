@@ -19,14 +19,21 @@ typedef ErrorCallback = void Function(RecorderException error);
 /// Called when recording is interrupted
 typedef InterruptionCallback = void Function(InterruptionData interruption);
 
-/// Simple voice recorder for Flutter
+/// Simple voice recorder for Flutter.
 /// 
-/// Example:
+/// **Basic Usage**:
 /// ```dart
 /// final recorder = VoiceRecorder();
-/// await recorder.initialize();
 /// await recorder.start();
 /// final recording = await recorder.stop();
+/// ```
+/// 
+/// **With Callbacks**:
+/// ```dart
+/// final recorder = VoiceRecorder(
+///   onStateChanged: (state) => print(state),
+///   onError: (error) => print(error),
+/// );
 /// ```
 class VoiceRecorder {
   /// Core recording service
@@ -147,10 +154,7 @@ class VoiceRecorder {
     onError?.call(error);
   }
 
-  /// Initialize the recorder
-  /// 
-  /// Call this once before recording. Do it upfront (e.g., in initState)
-  /// to avoid delay when starting recording.
+  /// Initialize the recorder (optional - auto-initializes on first start).
   Future<bool> initialize() async {
     _checkDisposed();
 
@@ -174,7 +178,7 @@ class VoiceRecorder {
         throw RecorderException.initializationFailed('Audio session initialization failed');
       }
 
-      // 4. Setup stream connections
+      // 3. Setup stream connections
       _setupStreamConnections();
 
       _isInitialized = true;
@@ -192,10 +196,8 @@ class VoiceRecorder {
 
   /// Sets up connections between services via streams
   void _setupStreamConnections() {
-    // Connect audio session interruptions to our interruption stream
     _interruptionSubscription = _audioSessionService.interruptionEvents.listen(
       (interruption) {
-        // Only emit interruption if we're actually recording or paused
         if (isRecording || isPaused) {
           _interruptionController.add(interruption);
           onInterruption?.call(interruption);
@@ -209,13 +211,13 @@ class VoiceRecorder {
     print('VoiceRecorder: Stream connections established');
   }
 
-  /// Start recording
+  /// Start recording.
   /// 
-  /// Simple: `await recorder.start()`
-  /// 
-  /// With path: `await recorder.start(path: '/my/recordings')`
-  /// 
-  /// Advanced: `await recorder.start(config: RecorderConfig.highQuality())`
+  /// ```dart
+  /// await recorder.start();
+  /// await recorder.start(config: RecorderConfig.highQuality());
+  /// await recorder.start(path: '/my/recordings');
+  /// ```
   Future<void> start({
     String? path,
     RecorderConfig? config,
@@ -239,22 +241,16 @@ class VoiceRecorder {
       final recordConfig = config ?? const RecorderConfig();
       _recorder.updateConfig(recordConfig);
 
-      // Handle storage config - prioritize simple path parameter
       StorageConfig finalStorageConfig;
       if (path != null) {
-        // User provided simple path - determine if it's a directory or file
         if (path.endsWith('.m4a') || path.endsWith('.mp3') || path.endsWith('.wav') || path.endsWith('.aac')) {
-          // It's a full file path
           finalStorageConfig = StorageConfig.withPath(path);
         } else {
-          // It's a directory
           finalStorageConfig = StorageConfig.withDirectory(path);
         }
       } else if (storageConfig != null) {
-        // User provided advanced storage config
         finalStorageConfig = storageConfig;
       } else {
-        // Use default (temp directory)
         finalStorageConfig = const StorageConfig();
       }
       
@@ -269,9 +265,7 @@ class VoiceRecorder {
       // 2. Start recording
       await _recorder.startRecording();
 
-      // 3. Start wave data collection
-
-      // 4. Start duration timer
+      // 3. Start duration timer
       _timerService.start();
 
       _notifyStateChange(RecordingState.recording);
@@ -286,7 +280,7 @@ class VoiceRecorder {
     }
   }
 
-  /// Pause recording (pause time not included in duration)
+  /// Pause recording.
   Future<void> pause() async {
     _checkDisposed();
 
@@ -312,7 +306,7 @@ class VoiceRecorder {
     }
   }
 
-  /// Resume recording
+  /// Resume recording.
   Future<void> resume() async {
     _checkDisposed();
 
@@ -330,6 +324,7 @@ class VoiceRecorder {
       }
 
       await _recorder.resumeRecording();
+
       _timerService.resume();
 
       _notifyStateChange(RecordingState.recording);
@@ -344,7 +339,7 @@ class VoiceRecorder {
     }
   }
 
-  /// Stop recording and get Recording object with path, duration, size
+  /// Stop recording and get file info.
   Future<Recording> stop() async {
     _checkDisposed();
 
@@ -390,7 +385,7 @@ class VoiceRecorder {
     }
   }
 
-  /// Delete current recording
+  /// Delete current recording.
   Future<void> delete() async {
     _checkDisposed();
 
@@ -417,7 +412,7 @@ class VoiceRecorder {
     }
   }
 
-  /// Restart recording (stops current and starts new)
+  /// Restart recording.
   Future<void> restart() async {
     _checkDisposed();
 
@@ -444,19 +439,7 @@ class VoiceRecorder {
     }
   }
 
-  /// Check if microphone is available
-  Future<bool> checkAudioFocusAvailable() async {
-    _checkDisposed();
-
-    try {
-      return await _recorder.initialize();
-    } catch (e) {
-      print('VoiceRecorder: Audio focus check error - $e');
-      return false;
-    }
-  }
-
-  /// Reset to initial state
+  /// Reset to idle state.
   Future<void> reset() async {
     _checkDisposed();
 
@@ -477,7 +460,7 @@ class VoiceRecorder {
     }
   }
 
-  /// Clean up resources (call when done)
+  /// Dispose resources.
   Future<void> dispose() async {
     if (_isDisposed) {
       return;

@@ -161,12 +161,6 @@ class AudioSessionService {
     print('AudioSessionService: System interruption - ${event.type}');
 
     if (event.begin) {
-      // Ignore unknown interruptions (false positives during recording setup)
-      // if (event.type == AudioInterruptionType.unknown) {
-      //   print('AudioSessionService: Ignoring unknown interruption (likely false positive)');
-      //   return;
-      // }
-
       // Interruption started
       final type = _mapInterruptionType(event.type);
       _emitInterruption(type, shouldPause: true);

@@ -27,9 +27,6 @@ class RecorderService {
   /// Recording configuration
   RecorderConfig _config = const RecorderConfig();
 
-  /// Storage configuration
-  StorageConfig _storageConfig = const StorageConfig();
-
   /// Current recording state
   RecordingState _state = RecordingState.idle;
 
@@ -39,17 +36,11 @@ class RecorderService {
   /// Full path to the current recording file
   String? _recordingFileFullPath;
 
-  /// Stream subscription for amplitude data
-  StreamSubscription<Amplitude>? _amplitudeSubscription;
-
-  /// Controller for broadcasting amplitude data to listeners
-  final StreamController<Amplitude> _amplitudeController = StreamController<Amplitude>.broadcast();
-
   /// Stream of amplitude data for waveform visualization
   ///
   /// Emits amplitude values while recording is active.
   /// Subscribe to this stream to get real-time audio levels.
-  Stream<Amplitude> get amplitudeStream => _amplitudeController.stream;
+  Stream<Amplitude> get amplitudeStream => _recorder.onAmplitudeChanged(const Duration(milliseconds: 100));
 
   Stream<RecordState> get onStateChanged => _recorder.onStateChanged();
 
@@ -78,7 +69,6 @@ class RecorderService {
 
   /// Updates the storage configuration
   void updateStorageConfig(StorageConfig config) {
-    _storageConfig = config;
     _storageHandler.setConfig(config);
   }
 
@@ -91,7 +81,6 @@ class RecorderService {
   /// Throws [RecorderException] if initialization fails
   Future<bool> initialize() async {
     try {
-      // Check if we have recording permission
       final hasPermission = await _recorder.hasPermission();
 
       if (!hasPermission) {
@@ -127,19 +116,15 @@ class RecorderService {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       _recordingFileName = '${_config.filePrefix}_$timestamp.${_config.fileExtension}';
 
-      // Get file path from storage handler
       final fileName = _recordingFileName;
       if (fileName == null) {
         throw RecorderException.recordingFailed('Failed to generate recording filename');
       }
 
-      // Get recording path using storage handler
       _recordingFileFullPath = await _storageHandler.getRecordingPath(fileName: fileName);
 
-      // Use configuration
       final recordConfig = _config.toRecordConfig();
 
-      // Start recording
       final filePath = _recordingFileFullPath;
       if (filePath == null) {
         throw RecorderException.storageError('Failed to get recording file path');
@@ -147,11 +132,7 @@ class RecorderService {
 
       await _recorder.start(recordConfig, path: filePath);
 
-      // Update state
       _state = RecordingState.recording;
-
-      // Start listening to amplitude for waveform
-      _startAmplitudeStream();
 
       print('RecorderService: Recording started - $_recordingFileName');
     } catch (e, stackTrace) {
@@ -225,20 +206,13 @@ class RecorderService {
         throw RecorderException.invalidState('No active recording to stop');
       }
 
-      // Stop recording
       final path = await _recorder.stop();
-
-      // Stop amplitude stream (do this regardless of path status)
-      await _stopAmplitudeStream();
-
-      // Update state (always update state after stopping)
       _state = RecordingState.stopped;
 
       if (path == null) {
         throw RecorderException.fileNotFound('Recording stopped but no file path returned');
       }
 
-      // Get the file
       final file = File(path);
 
       if (!await file.exists()) {
@@ -249,8 +223,6 @@ class RecorderService {
       return file;
     } catch (e, stackTrace) {
       print('RecorderService: Stop recording error - $e');
-      // Ensure cleanup happens even on error
-      await _stopAmplitudeStream();
       _state = RecordingState.stopped;
       
       if (e is RecorderException) {
@@ -277,7 +249,6 @@ class RecorderService {
       // Stop current recording
       if (isRecording || isPaused) {
         await _recorder.stop();
-        await _stopAmplitudeStream();
       }
 
       // Start new recording
@@ -303,7 +274,6 @@ class RecorderService {
       // Stop recording if active
       if (isRecording || isPaused) {
         await _recorder.stop();
-        await _stopAmplitudeStream();
       }
 
       // Delete file if exists
@@ -331,35 +301,6 @@ class RecorderService {
     }
   }
 
-  /// Starts streaming amplitude data for waveform visualization
-  void _startAmplitudeStream() {
-    _amplitudeSubscription = _recorder.onAmplitudeChanged(const Duration(milliseconds: 100)).listen(
-      (amplitude) {
-        // Forward amplitude to our broadcast stream
-        if (!_amplitudeController.isClosed) {
-          _amplitudeController.add(amplitude);
-        }
-      },
-      onError: (error) {
-        print('RecorderService: Amplitude stream error - $error');
-      },
-    );
-
-    _recorder.onStateChanged().listen(
-      (event) {
-        log("log: newStateUpdate ${event.name}");
-      },
-      onError: (error) {
-        print('RecorderService: State change stream error - $error');
-      },
-    );
-  }
-
-  /// Stops the amplitude stream
-  Future<void> _stopAmplitudeStream() async {
-    await _amplitudeSubscription?.cancel();
-    _amplitudeSubscription = null;
-  }
 
   /// Disposes the recorder and cleans up resources
   ///
@@ -370,14 +311,6 @@ class RecorderService {
       // Stop recording if active
       if (await _recorder.isRecording()) {
         await _recorder.stop();
-      }
-
-      // Cancel amplitude subscription
-      await _stopAmplitudeStream();
-      
-      // Close amplitude controller
-      if (!_amplitudeController.isClosed) {
-        await _amplitudeController.close();
       }
 
       // Dispose recorder

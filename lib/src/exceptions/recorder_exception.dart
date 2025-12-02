@@ -1,3 +1,5 @@
+import '../../voice_recorder.dart';
+
 /// Base exception class for recorder errors
 /// 
 /// Provides structured error information with type classification
@@ -107,32 +109,3 @@ class RecorderException implements Exception {
   }
 }
 
-/// Types of errors that can occur in the recorder
-enum RecorderErrorType {
-  /// Microphone permission was denied
-  permissionDenied,
-  
-  /// Recorder initialization failed
-  initializationFailed,
-  
-  /// Recording operation failed
-  recordingFailed,
-  
-  /// Recording file was not found
-  fileNotFound,
-  
-  /// Storage operation failed
-  storageError,
-  
-  /// Invalid state for the requested operation
-  invalidState,
-  
-  /// Audio session configuration failed
-  audioSessionError,
-  
-  /// Recorder has been disposed
-  disposed,
-  
-  /// Unknown error
-  unknown,
-}

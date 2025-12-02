@@ -4,57 +4,33 @@ import '../config/wave_config.dart';
 import '../enums/enums.dart';
 import 'wave_painter.dart';
 
-/// Audio wave visualization widget
+/// Real-time audio wave visualization.
 /// 
-/// Displays real-time audio waveform based on amplitude stream.
-/// Automatically syncs with recording state for visual feedback.
+/// **Simple Usage**:
+/// AudioWaveWidget.fromRecorder(recorder: recorder)
 /// 
-/// Example:
-/// ```dart
-/// AudioWaveWidget(
-///   amplitudeStream: recorder.amplitudeStream.map((amp) => amp.current),
-///   recordingState: recordingState,
+/// **With Customization**:
+/// AudioWaveWidget.fromRecorder(
+///   recorder: recorder,
 ///   config: WaveConfig.modern(),
 /// )
-/// ```
 class AudioWaveWidget extends StatefulWidget {
-  /// Stream of amplitude values in decibels (typically -160 to 0)
-  /// 
-  /// Usually obtained from VoiceRecorder:
-  /// ```dart
-  /// recorder.amplitudeStream.map((amp) => amp.current)
-  /// ```
+  /// Amplitude stream (decibels)
   final Stream<double> amplitudeStream;
   
-  /// Current recording state to determine visual behavior
-  /// 
-  /// - [RecordingState.recording]: Active animated waves
-  /// - [RecordingState.paused]: Frozen gray waves
-  /// - [RecordingState.stopped]: Gray bars or flat line
-  /// - [RecordingState.idle]: Flat line
+  /// Current recording state
   final RecordingState recordingState;
   
-  /// Wave configuration for customization
-  /// 
-  /// If null, uses [WaveConfig.standard()]
+  /// Wave styling (optional)
   final WaveConfig? config;
   
-  /// Container decoration (background, border, shadow, etc.)
-  /// 
-  /// Example:
-  /// ```dart
-  /// BoxDecoration(
-  ///   color: Colors.white,
-  ///   borderRadius: BorderRadius.circular(12),
-  ///   boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
-  /// )
-  /// ```
+  /// Container decoration (optional)
   final BoxDecoration? decoration;
   
-  /// Internal padding around the wave
+  /// Internal padding (optional)
   final EdgeInsets? padding;
   
-  /// External margin around the container
+  /// External margin (optional)
   final EdgeInsets? margin;
   
   const AudioWaveWidget({
@@ -176,7 +152,6 @@ class _AudioWaveWidgetState extends State<AudioWaveWidget>
       currentBuffer.removeAt(0);
     }
     
-    // Update ValueNotifier - only rebuilds CustomPaint, not entire widget
     _amplitudeBuffer.value = currentBuffer;
   }
   
@@ -184,7 +159,6 @@ class _AudioWaveWidgetState extends State<AudioWaveWidget>
   /// 
   /// Based on typical device data: -2 dB (loud) to -40 dB (quiet)
   double _normalizeAmplitude(double amplitude) {
-    // Handle edge cases
     if (amplitude.isInfinite || amplitude.isNaN) {
       return 0.0;
     }
@@ -193,10 +167,8 @@ class _AudioWaveWidgetState extends State<AudioWaveWidget>
     const double minDb = -40.0;
     const double maxDb = -2.0;
     
-    // Clamp to valid range
     final clampedDb = amplitude.clamp(minDb, maxDb);
     
-    // Linear normalization to 0.0-1.0
     final normalized = (clampedDb - minDb) / (maxDb - minDb);
     
     return normalized.clamp(0.0, 1.0);
@@ -205,10 +177,8 @@ class _AudioWaveWidgetState extends State<AudioWaveWidget>
   void _handleStateChange(RecordingState oldState, RecordingState newState) {
     if (newState == RecordingState.stopped || newState == RecordingState.idle) {
       if (!_config.showInactiveWhenStopped) {
-        // Clear buffer to show flat line
         _amplitudeBuffer.value = [];
       }
-      // Keep buffer to show gray bars if showInactiveWhenStopped is true
     }
   }
   
