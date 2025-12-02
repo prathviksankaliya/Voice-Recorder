@@ -77,7 +77,10 @@ export 'src/enums/enums.dart';
 export 'src/exceptions/recorder_exception.dart';
 
 // Widgets (optional UI components)
-export 'src/widgets/wave_data_manager.dart';
+export 'src/widgets/audio_wave_widget.dart';
+
+// Wave configuration
+export 'src/config/wave_config.dart';
 
 // Re-export commonly used types from dependencies
 export 'package:record/record.dart' show Amplitude, RecordState, AudioEncoder;

@@ -6,7 +6,6 @@ import '../models/recording.dart';
 import '../services/audio_session_service.dart';
 import '../services/recorder_service.dart';
 import '../services/recording_timer_service.dart';
-import '../widgets/wave_data_manager.dart';
 import '../config/recorder_config.dart';
 import '../config/storage_config.dart';
 import '../exceptions/recorder_exception.dart';
@@ -35,9 +34,6 @@ class VoiceRecorder {
   
   /// Audio session and interruption management
   final AudioSessionService _audioSessionService = AudioSessionService.instance;
-  
-  /// Waveform data management
-  final WaveDataManager _waveManager = WaveDataManager.instance;
 
   /// Recording timer service for accurate duration tracking
   final RecordingTimerService _timerService = RecordingTimerService();
@@ -133,24 +129,6 @@ class VoiceRecorder {
     return _timerService.currentDuration;
   }
 
-  /// True if waveform data available
-  bool get hasAmplitudeData {
-    _checkDisposed();
-    return _waveManager.hasData;
-  }
-
-  /// Waveform data for visualization
-  List<double> get waveformBuffer {
-    _checkDisposed();
-    return _waveManager.currentBuffer;
-  }
-
-  /// Direct access to wave manager
-  WaveDataManager get waveManager {
-    _checkDisposed();
-    return _waveManager;
-  }
-
   /// Checks if the recorder has been disposed
   void _checkDisposed() {
     if (_isDisposed) {
@@ -190,10 +168,7 @@ class VoiceRecorder {
         throw RecorderException.initializationFailed('Recorder initialization failed');
       }
 
-      // 2. Initialize wave manager
-      _waveManager.initialize();
-
-      // 3. Initialize audio session
+      // 2. Initialize audio session
       final audioSessionInit = await _audioSessionService.initialize();
       if (!audioSessionInit) {
         throw RecorderException.initializationFailed('Audio session initialization failed');
@@ -217,17 +192,6 @@ class VoiceRecorder {
 
   /// Sets up connections between services via streams
   void _setupStreamConnections() {
-    // Connect recorder amplitude to wave manager
-    _amplitudeSubscription = _recorder.amplitudeStream.listen(
-      (amplitude) {
-        final decibels = amplitude.current;
-        _waveManager.addAmplitude(decibels);
-      },
-      onError: (error) {
-        print('VoiceRecorder: Amplitude stream error - $error');
-      },
-    );
-
     // Connect audio session interruptions to our interruption stream
     _interruptionSubscription = _audioSessionService.interruptionEvents.listen(
       (interruption) {
@@ -259,8 +223,13 @@ class VoiceRecorder {
   }) async {
     _checkDisposed();
 
+    // Auto-initialize if not already initialized (convenience for beginners)
     if (!_isInitialized) {
-      throw RecorderException.invalidState('Recorder not initialized. Call initialize() first.');
+      print('VoiceRecorder: Auto-initializing...');
+      final initialized = await initialize();
+      if (!initialized) {
+        throw RecorderException.invalidState('Failed to initialize recorder');
+      }
     }
 
     try {
@@ -301,7 +270,6 @@ class VoiceRecorder {
       await _recorder.startRecording();
 
       // 3. Start wave data collection
-      _waveManager.startRecording();
 
       // 4. Start duration timer
       _timerService.start();
@@ -330,7 +298,6 @@ class VoiceRecorder {
       print('VoiceRecorder: Pausing recording...');
 
       await _recorder.pauseRecording();
-      _waveManager.pauseRecording();
       _timerService.pause();
 
       _notifyStateChange(RecordingState.paused);
@@ -363,7 +330,6 @@ class VoiceRecorder {
       }
 
       await _recorder.resumeRecording();
-      _waveManager.resumeRecording();
       _timerService.resume();
 
       _notifyStateChange(RecordingState.recording);
@@ -393,7 +359,6 @@ class VoiceRecorder {
       final duration = _timerService.stop();
 
       final file = await _recorder.stopRecording();
-      _waveManager.stopRecording();
 
       if (file == null || !file.existsSync()) {
         throw RecorderException.fileNotFound('Recording file not found');
@@ -438,7 +403,6 @@ class VoiceRecorder {
       }
 
       await _recorder.deleteRecording();
-      _waveManager.clearData();
       await _audioSessionService.reset();
 
       _notifyStateChange(RecordingState.idle);
@@ -464,8 +428,6 @@ class VoiceRecorder {
       _timerService.stop();
 
       await _recorder.restartRecording();
-      _waveManager.clearData();
-      _waveManager.startRecording();
 
       // Start new timer
       _timerService.start();
@@ -506,7 +468,6 @@ class VoiceRecorder {
         await _recorder.stopRecording();
       }
 
-      _waveManager.clearData();
       await _audioSessionService.reset();
 
       _notifyStateChange(RecordingState.idle);
@@ -534,7 +495,6 @@ class VoiceRecorder {
       await _recorder.dispose();
       await _timerService.dispose();
       _audioSessionService.reset();
-      _waveManager.clearData();
 
       _isDisposed = true;
       _isInitialized = false;

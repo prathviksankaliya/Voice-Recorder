@@ -69,3 +69,27 @@ enum InterruptionType {
   /// Unknown interruption type
   unknown,
 }
+
+/// Alignment for wave bars in audio visualization
+enum WaveAlignment {
+  /// Align bars to top
+  top,
+  
+  /// Align bars to center (default)
+  center,
+  
+  /// Align bars to bottom
+  bottom,
+}
+
+/// Visual style for wave rendering
+enum WaveStyle {
+  /// Vertical bars (default)
+  bars,
+  
+  /// Rounded vertical bars
+  rounded,
+  
+  /// Connected line
+  line,
+}
