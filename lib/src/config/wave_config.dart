@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../enums/enums.dart';
 
-/// Configuration for audio wave visualization
-/// 
 /// Customize the appearance and behavior of [AudioWaveWidget].
 /// 
 /// Example:
@@ -94,77 +92,6 @@ class WaveConfig {
     this.showInactiveWhenStopped = true,
     this.smoothTransitions = true,
   });
-  
-  /// Minimal preset - simple and clean
-  /// 
-  /// Small bars, minimal animation, perfect for compact UIs
-  factory WaveConfig.minimal() {
-    return const WaveConfig(
-      height: 40.0,
-      barWidth: 2.0,
-      barSpacing: 1.5,
-      barCount: 30,
-      minBarHeight: 2.0,
-      waveColor: Colors.blue,
-      inactiveColor: Colors.grey,
-      style: WaveStyle.bars,
-      alignment: WaveAlignment.center,
-    );
-  }
-  
-  /// Standard preset - balanced appearance
-  /// 
-  /// Good default for most use cases
-  factory WaveConfig.standard() {
-    return const WaveConfig(
-      height: 80.0,
-      barWidth: 3.0,
-      barSpacing: 2.0,
-      barCount: 50,
-      minBarHeight: 4.0,
-      waveColor: Colors.blue,
-      inactiveColor: Colors.grey,
-      style: WaveStyle.bars,
-      alignment: WaveAlignment.center,
-    );
-  }
-  
-  /// Modern preset - smooth and stylish
-  /// 
-  /// Rounded bars with smooth animations
-  factory WaveConfig.modern() {
-    return WaveConfig(
-      height: 100.0,
-      barWidth: 4.0,
-      barSpacing: 3.0,
-      barCount: 60,
-      minBarHeight: 6.0,
-      waveColor: Colors.blue,
-      inactiveColor: Colors.grey.shade300,
-      style: WaveStyle.rounded,
-      barBorderRadius: BorderRadius.circular(4.0),
-      alignment: WaveAlignment.center,
-      animationDuration: const Duration(milliseconds: 200),
-      animationCurve: Curves.easeInOutCubic,
-    );
-  }
-  
-  /// Detailed preset - high resolution
-  /// 
-  /// Many bars for detailed visualization
-  factory WaveConfig.detailed() {
-    return const WaveConfig(
-      height: 120.0,
-      barWidth: 2.0,
-      barSpacing: 1.0,
-      barCount: 100,
-      minBarHeight: 3.0,
-      waveColor: Colors.blue,
-      inactiveColor: Colors.grey,
-      style: WaveStyle.bars,
-      alignment: WaveAlignment.center,
-    );
-  }
   
   /// Creates a copy with modified properties
   WaveConfig copyWith({

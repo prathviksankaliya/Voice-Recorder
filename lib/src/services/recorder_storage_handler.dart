@@ -42,22 +42,6 @@ class RecorderStorageHandler {
       return userPath;
     }
     
-    // Priority 2: Custom directory
-    final customDir = config?.customDirectory;
-    if (customDir != null && customDir.isNotEmpty) {
-      final directory = Directory(customDir);
-      
-      if (!await directory.exists()) {
-        await directory.create(recursive: true);
-      }
-      
-      final filename = fileName ?? _generateFilename(config);
-      final filePath = path.join(directory.path, filename);
-      
-      print('RecorderStorageHandler: Using custom directory - $filePath');
-      return filePath;
-    }
-    
     // Priority 3: Temp directory (default fallback)
     if (config?.useTempDirectory ?? true) {
       final tempDir = await getTemporaryDirectory();

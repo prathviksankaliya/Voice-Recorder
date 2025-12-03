@@ -88,7 +88,7 @@ class _AudioWaveWidgetState extends State<AudioWaveWidget>
   @override
   void initState() {
     super.initState();
-    _config = widget.config ?? WaveConfig.standard();
+    _config = widget.config ?? WaveConfig();
     _setupAnimation();
     _subscribeToAmplitudeStream();
   }
@@ -100,7 +100,7 @@ class _AudioWaveWidgetState extends State<AudioWaveWidget>
     // Update config if changed
     if (widget.config != oldWidget.config) {
       setState(() {
-        _config = widget.config ?? WaveConfig.standard();
+        _config = widget.config ?? WaveConfig();
       });
     }
     

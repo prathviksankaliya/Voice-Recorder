@@ -1,21 +1,21 @@
-/// Simple voice recording for Flutter.
+/// Voice Recorder - Simple audio recording for Flutter
 /// 
-/// **Quick Start** (2 lines):
+/// Record high-quality audio with just 2 lines of code:
 /// ```dart
 /// final recorder = VoiceRecorder();
 /// await recorder.start();
 /// final recording = await recorder.stop();
 /// ```
 /// 
-/// **With Wave Visualization**:
-/// ```dart
-/// AudioWaveWidget.fromRecorder(recorder: recorder)
-/// ```
+/// Features:
+/// - Easy recording controls (start, pause, resume, stop)
+/// - Real-time audio waveform visualization
+/// - Customizable audio quality presets
+/// - Flexible storage configuration
+/// - Automatic interruption handling (calls, headphones, etc.)
+/// - Duration tracking with pause support
 /// 
-/// **Customize Quality**:
-/// ```dart
-/// await recorder.start(config: RecorderConfig.highQuality());
-/// ```
+/// See [VoiceRecorder] for the main API.
 library;
 
 // Core manager

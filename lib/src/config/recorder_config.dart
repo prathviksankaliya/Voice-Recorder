@@ -30,12 +30,6 @@ class RecorderConfig {
   /// Noise suppression
   final bool noiseSuppress;
   
-  /// Filename prefix
-  final String filePrefix;
-  
-  /// File extension
-  final String fileExtension;
-  
   /// Android config (optional)
   final AndroidRecorderConfig? androidConfig;
 
@@ -47,8 +41,6 @@ class RecorderConfig {
     this.autoGain = true,
     this.echoCancel = true,
     this.noiseSuppress = true,
-    this.filePrefix = 'recording',
-    this.fileExtension = 'm4a',
     this.androidConfig,
   });
 
@@ -135,8 +127,6 @@ class RecorderConfig {
       autoGain: autoGain ?? this.autoGain,
       echoCancel: echoCancel ?? this.echoCancel,
       noiseSuppress: noiseSuppress ?? this.noiseSuppress,
-      filePrefix: filePrefix ?? this.filePrefix,
-      fileExtension: fileExtension ?? this.fileExtension,
       androidConfig: androidConfig ?? this.androidConfig,
     );
   }
@@ -180,14 +170,10 @@ class AndroidServiceConfig {
   
   /// Service notification content
   final String content;
-  
-  /// Notification icon (optional)
-  final String? icon;
 
   const AndroidServiceConfig({
     required this.title,
     required this.content,
-    this.icon,
   });
 
   AndroidService toAndroidService() {

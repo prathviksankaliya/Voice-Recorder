@@ -4,21 +4,25 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS-green.svg)](https://pub.dev/packages/voice_recorder)
 
-**Simple, powerful audio recording for Flutter.** Record high-quality audio with just 2 lines of code.
+**The easiest way to add audio recording to your Flutter app.** 🚀
 
-Perfect for voice notes, interviews, podcasts, or any audio recording needs.
+Record crystal-clear audio with just **2 lines of code**. Built-in waveforms, background recording support, and automatic interruption handling make this the most developer-friendly audio recorder for Flutter.
+
+✨ **Perfect for:** Voice notes • Interviews • Podcasts • Voice memos • Audio messaging • Language learning apps
 
 ---
 
-## ✨ Why Choose This Package?
+## ✨ Why Developers Love This Package
 
-- 🚀 **Super Simple** - Just 2 lines to start recording
-- 🎨 **Wave Visualization** - Built-in real-time waveform widget
-- ⚡ **Auto-Initialize** - No manual setup needed
-- 🎯 **Beginner Friendly** - Clear examples, easy to understand
-- 🏗️ **Production Ready** - Error handling, interruptions, edge cases
-- 🎛️ **Fully Customizable** - Simple defaults, powerful when needed
-- 📱 **Cross Platform** - Works on Android & iOS
+- 🚀 **2-Line Setup** - Literally start recording in seconds
+- 🎨 **Beautiful Waveforms** - Animated, real-time audio visualization included
+- 🔄 **Background Recording** - Keep recording even when app is in background
+- ⚡ **Zero Config** - Works out of the box, no complex initialization
+- 🎯 **Beginner Friendly** - Crystal-clear docs with copy-paste examples
+- 🛡️ **Bulletproof** - Handles phone calls, interruptions, and edge cases automatically
+- 🎛️ **Flexible** - Simple for beginners, powerful for pros
+- 📱 **True Cross-Platform** - Identical API for Android & iOS
+- 🎧 **Smart Interruptions** - Auto-pauses for calls, headphone disconnects, etc.
 
 ---
 
@@ -45,7 +49,7 @@ flutter pub get
 import 'package:voice_recorder/voice_recorder.dart';
 ```
 
-### 2. Record Audio (2 lines!)
+### 2. Record Audio (3 lines!)
 ```dart
 final recorder = VoiceRecorder();
 await recorder.start();
@@ -64,7 +68,7 @@ print('Size: ${(recording.sizeInBytes / 1024).toStringAsFixed(1)} KB');
 
 ---
 
-## 🎨 With Wave Visualization (4 lines!)
+## 🎨 With Wave Visualization
 
 ```dart
 final recorder = VoiceRecorder();
@@ -80,26 +84,72 @@ await recorder.start();
 
 ---
 
-## 🔧 Platform Setup
+## 🔧 Platform Setup & Permissions
 
-### Android
+### 📱 Android Setup
 
-Add to `android/app/src/main/AndroidManifest.xml`:
+Add these permissions to `android/app/src/main/AndroidManifest.xml`:
 
 ```xml
+<!-- Required: Microphone access for recording -->
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+<!-- Required for Android 12 and below (auto-ignored on 13+) -->
 <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
                  android:maxSdkVersion="28" />
+
+<!-- Optional: For background recording (highly recommended) -->
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+
+<!-- Optional: Android 13+ notifications -->
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 ```
 
-### iOS
+#### 🔄 Background Recording on Android
 
-Add to `ios/Runner/Info.plist`:
+To enable recording when your app is in the background, add this to your `<application>` tag:
 
 ```xml
-<key>NSMicrophoneUsageDescription</key>
-<string>We need microphone access to record audio</string>
+<application>
+  <!-- Your existing config -->
+  
+  <!-- Add this for background recording -->
+  <service
+      android:name="com.example.voice_recorder.RecordingService"
+      android:foregroundServiceType="microphone"
+      android:exported="false" />
+</application>
 ```
+
+**Why?** Android requires a foreground service to record audio in the background. This ensures users know recording is active via a persistent notification.
+
+### 🍎 iOS Setup
+
+Add these keys to `ios/Runner/Info.plist`:
+
+```xml
+<!-- Required: Microphone permission -->
+<key>NSMicrophoneUsageDescription</key>
+<string>We need microphone access to record your voice notes</string>
+
+<!-- Optional but recommended: Background audio -->
+<key>UIBackgroundModes</key>
+<array>
+  <string>audio</string>
+</array>
+```
+
+**Pro Tip:** Customize the `NSMicrophoneUsageDescription` message to explain *why* your app needs the microphone. Users are more likely to grant permission when they understand the reason!
+
+#### 🔄 Background Recording on iOS
+
+iOS automatically supports background recording when you add the `audio` background mode above. The recording continues even when:
+- ✅ App is minimized
+- ✅ Screen is locked
+- ✅ User switches to another app
+
+**Note:** iOS will show a red bar at the top of the screen indicating active recording, which is a system requirement for user privacy.
 
 ---
 
@@ -116,23 +166,13 @@ final recorder = VoiceRecorder();
 // Start recording
 await recorder.start();
 
+await recorder.pause();   // Pause
+await recorder.resume();  // Resume
+
 // Stop and get file info
 final recording = await recorder.stop();
 print('Path: ${recording.path}');
 print('Duration: ${recording.duration.inSeconds}s');
-```
-
-### With Pause/Resume
-
-```dart
-final recorder = VoiceRecorder(
-  onStateChanged: (state) => print('State: $state'),
-);
-
-await recorder.start();
-await recorder.pause();   // Pause
-await recorder.resume();  // Resume
-final recording = await recorder.stop();
 ```
 
 ### With Callbacks
@@ -198,10 +238,13 @@ await recorder.start(
 ```dart
 AudioWaveWidget.fromRecorder(
   recorder: recorder,
-  config: WaveConfig.modern(),
-  decoration: BoxDecoration(
-    color: Colors.blue.shade50,
-    borderRadius: BorderRadius.circular(16),
+  config: WaveConfig(
+  waveColor: Colors.blue,
+  inactiveColor: Colors.grey,
+  height: 100,
+  barWidth: 4,
+  barSpacing: 3,
+  style: WaveStyle.rounded,
   ),
 )
 ```
@@ -213,31 +256,6 @@ recorder.amplitudeStream.listen((amplitude) {
   final decibels = amplitude.current;
   // Build your own custom visualization
 });
-```
-
-### Wave Presets
-
-```dart
-WaveConfig.minimal()    // Simple, clean
-WaveConfig.standard()   // Default
-WaveConfig.modern()     // Stylish, animated
-WaveConfig.detailed()   // Dense, detailed
-```
-
-### Custom Wave Styling
-
-```dart
-AudioWaveWidget.fromRecorder(
-  recorder: recorder,
-  config: WaveConfig(
-    waveColor: Colors.blue,
-    inactiveColor: Colors.grey,
-    height: 100,
-    barWidth: 4,
-    barSpacing: 3,
-    style: WaveStyle.rounded,
-  ),
-)
 ```
 
 ---
@@ -263,22 +281,74 @@ String formatDuration(Duration d) {
 
 ---
 
-## 📞 Interruption Handling
+## 📞 Smart Interruption Handling
 
-Automatically handles:
-- ☎️ Phone calls
-- 🎧 Headphone disconnect
-- 📱 Bluetooth disconnect
-- 🔊 Audio route changes
+**Never lose a recording again!** The package automatically handles real-world interruptions:
+
+### What's Handled Automatically
+
+- ☎️ **Phone Calls** - Auto-pauses recording
+- 🎧 **Headphone Disconnect** - Pauses to prevent speaker playback
+- 📱 **Bluetooth Disconnect** - Handles audio device changes
+- 🔊 **Audio Route Changes** - Adapts to new audio output
+- 📲 **App Backgrounding** - Continues recording in background (if configured)
+
+### Listen to Interruptions
 
 ```dart
 final recorder = VoiceRecorder(
   onInterruption: (interruption) {
-    if (interruption.type == InterruptionType.phoneCall) {
-      // Recording automatically paused
-      showNotification('Recording paused due to phone call');
+    switch (interruption.type) {
+      case InterruptionType.phoneCall:
+        // Recording automatically paused
+        showNotification('Recording paused - incoming call');
+        break;
+      
+      case InterruptionType.headphoneDisconnect:
+        // Paused to prevent audio playing on speaker
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Headphones Disconnected'),
+            content: Text('Recording paused. Reconnect to continue.'),
+          ),
+        );
+        break;
+      
+      case InterruptionType.audioRouteChange:
+        print('Audio route changed: ${interruption.reason}');
+        break;
     }
   },
+);
+```
+
+### Background Recording Behavior
+
+When your app goes to the background:
+
+**iOS:**
+- ✅ Recording continues automatically
+- ✅ Red status bar indicates active recording
+- ✅ Lock screen shows recording status
+
+**Android:**
+- ✅ Foreground service keeps recording alive
+- ✅ Persistent notification shows recording status
+
+### Customize Background Notification (Android)
+
+```dart
+await recorder.start(
+  config: RecorderConfig(
+    androidConfig: AndroidRecorderConfig(
+      serviceConfig: AndroidServiceConfig(
+        title: "Audio Recorder",
+        content: "Recording is Ongoing...",
+      ),
+    ),
+  ),
+storageConfig: StorageConfig.visible(),
 );
 ```
 
@@ -302,7 +372,7 @@ VoiceRecorder({
 #### Methods
 | Method | Description |
 |--------|-------------|
-| `start({path, config, storageConfig})` | Start recording |
+| `start({config, storageConfig})` | Start recording |
 | `pause()` | Pause recording |
 | `resume()` | Resume recording |
 | `stop()` | Stop and get Recording object |
@@ -357,50 +427,35 @@ RecorderConfig(
 )
 ```
 
-### WaveConfig
-
-Wave visualization configuration.
-
-#### Presets
-```dart
-WaveConfig.minimal()    // Simple, clean
-WaveConfig.standard()   // Default
-WaveConfig.modern()     // Stylish, animated
-WaveConfig.detailed()   // Dense, detailed
-```
-
-#### Custom
-```dart
-WaveConfig(
-  waveColor: Colors.blue,
-  inactiveColor: Colors.grey,
-  height: 100,
-  barWidth: 4,
-  barSpacing: 3,
-  barCount: 50,
-  style: WaveStyle.rounded,
-)
-```
-
 ---
 
-## 🔐 Permissions
+## 🔐 Runtime Permissions (Important!)
 
-### Request at Runtime
+
+
+### 🔄 Background Recording Permissions
+
+For apps that need background recording, request additional permissions:
 
 ```dart
-import 'package:permission_handler/permission_handler.dart';
-
-Future<bool> requestPermission() async {
-  final status = await Permission.microphone.request();
-  return status.isGranted;
-}
-
-// Use it
-if (await requestPermission()) {
-  await recorder.start();
-} else {
-  print('Microphone permission denied');
+Future<bool> requestBackgroundPermissions() async {
+  // Request microphone first
+  final micStatus = await Permission.microphone.request();
+  
+  if (!micStatus.isGranted) {
+    return false;
+  }
+  
+  // For Android 13+ (API 33+), request notification permission
+  // This is needed for foreground service notification
+  if (Platform.isAndroid) {
+    final notificationStatus = await Permission.notification.request();
+    if (!notificationStatus.isGranted) {
+      print('Notification permission needed for background recording');
+    }
+  }
+  
+  return true;
 }
 ```
 
@@ -408,94 +463,140 @@ if (await requestPermission()) {
 
 ## ❓ Troubleshooting
 
-### Permission Denied
-**Problem**: Recording fails with permission error
+### 🚫 Permission Denied
+**Problem**: Recording fails with "Permission denied" error
 
-**Solution**:
-1. Add platform permissions (see Platform Setup)
-2. Request permission at runtime
-3. Check device settings
+**Solutions**:
+1. ✅ Add platform permissions to `AndroidManifest.xml` / `Info.plist` (see [Platform Setup](#-platform-setup--permissions))
+2. ✅ Request permission at runtime using `permission_handler` package
+3. ✅ Check device settings - user may have denied permission
+4. ✅ On iOS, check if microphone is restricted in Screen Time settings
+5. ✅ Test on a real device (permissions behave differently on simulators)
 
-### File Not Found
-**Problem**: Recording file not found after stop
-
-**Solution**:
-- Use `StorageConfig.visible()` for persistent storage
-- Check write permissions
-- Verify path is accessible
-
-### No Audio Recorded
-**Problem**: File created but no audio
-
-**Solution**:
-- Check microphone is not used by another app
-- Verify microphone permission granted
-- Test with different quality settings
-
-### Wave Not Showing
-**Problem**: Wave widget not displaying
-
-**Solution**:
-- Ensure `recordingState` is passed correctly
-- Check if amplitude stream is active
-- Verify widget is in widget tree
-
----
-
-## 💡 Tips & Best Practices
-
-### 1. Initialize Early
 ```dart
-@override
-void initState() {
-  super.initState();
-  recorder.initialize(); // Do this early
-}
+// Debug permission status
+final status = await Permission.microphone.status;
+print('Microphone permission: $status');
 ```
 
-### 2. Always Dispose
-```dart
-@override
-void dispose() {
-  recorder.dispose(); // Clean up
-  super.dispose();
-}
-```
+### 📁 File Not Found
+**Problem**: Recording file not found after calling `stop()`
 
-### 3. Handle Errors
-```dart
-final recorder = VoiceRecorder(
-  onError: (error) {
-    // Show user-friendly message
-    showDialog(...);
-  },
-);
-```
+**Solutions**:
+- ✅ Use `StorageConfig.visible()` for persistent storage
+- ✅ Verify the path is accessible and not in a restricted directory
 
-### 4. Use Visible Storage for Important Recordings
 ```dart
+// Use visible or custom path config for important recordings
 await recorder.start(
   storageConfig: StorageConfig.visible(),
 );
 ```
 
-### 5. Format Duration for Display
+### 🔇 No Audio Recorded
+**Problem**: File is created but contains no audio or is silent
+
+**Solutions**:
+- ✅ Check microphone is not being used by another app
+- ✅ Verify microphone permission is actually granted (not just requested)
+- ✅ Test with different quality settings (try `RecorderConfig.highQuality()`)
+- ✅ On Android, check if "Microphone" is disabled in app settings
+- ✅ Restart the device (sometimes audio session gets stuck)
+
 ```dart
-String formatDuration(Duration d) {
-  return '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
+// Test with high quality settings
+await recorder.start(
+  config: RecorderConfig.highQuality(),
+);
+```
+
+### 🌊 Wave Not Showing
+**Problem**: Wave widget not displaying or not animating
+
+**Solutions**:
+- ✅ Ensure recorder is actually recording (check `recorder.isRecording`)
+- ✅ Verify `AudioWaveWidget.fromRecorder()` is passed the correct recorder instance
+- ✅ Check if widget is in the widget tree and has non-zero size
+- ✅ Try different wave configs (e.g., `WaveConfig.modern()`)
+
+```dart
+// Debug amplitude stream
+recorder.amplitudeStream.listen((amplitude) {
+  print('Amplitude: ${amplitude.current}');
+});
+```
+
+### 🔄 Background Recording Stops
+**Problem**: Recording stops when app goes to background
+
+**Solutions**:
+
+**Android:**
+- ✅ Add `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_MICROPHONE` permissions
+- ✅ Declare the recording service in `AndroidManifest.xml`
+- ✅ Request notification permission on Android 13+ (API 33+)
+- ✅ Ensure battery optimization is disabled for your app
+
+**iOS:**
+- ✅ Add `audio` to `UIBackgroundModes` in `Info.plist`
+- ✅ Ensure audio session is configured correctly (handled automatically)
+- ✅ Check if Low Power Mode is affecting background tasks
+
+
+### 📱 App Crashes on Start
+**Problem**: App crashes when calling `recorder.start()`
+
+**Solutions**:
+- ✅ Ensure all platform permissions are added
+- ✅ Check for conflicting audio plugins
+- ✅ Verify you're not calling `start()` multiple times simultaneously
+- ✅ Make sure to call `dispose()` on old recorder instances
+- ✅ Check device logs for specific error messages
+
+```dart
+// Proper lifecycle management
+@override
+void dispose() {
+  recorder.dispose(); // Always dispose!
+  super.dispose();
 }
 ```
+
+### 🔊 Audio Quality Issues
+**Problem**: Recording sounds muffled, distorted, or low quality
+
+**Solutions**:
+- ✅ Use `RecorderConfig.highQuality()` for better audio
+- ✅ Increase `bitRate` and `sampleRate` in custom config
+- ✅ Enable `noiseSuppress: false` if it's affecting quality
+- ✅ Test in a quiet environment to rule out background noise
+- ✅ Check if device microphone is physically blocked or damaged
+
+```dart
+// Maximum quality settings
+await recorder.start(
+  config: RecorderConfig(
+    bitRate: 256000,
+    sampleRate: 48000,
+    numChannels: 2, // Stereo
+    noiseSuppress: false,
+  ),
+);
+```
+
+### 💡 Still Having Issues?
+
+1. **Enable Debug Logging**: Check console for detailed error messages
+2. **Test on Real Device**: Emulators have limited audio support
+3. **Check Example App**: Run the example app to verify setup
+4. **Update Dependencies**: Ensure you're using the latest version
+5. **Report Bug**: [Open an issue](https://github.com/prathviksankaliya/voice-recorder/issues) with device info and logs
 
 ---
 
 ## 🎓 Examples
 
-Check out the `/example` folder for complete examples:
-
-1. **Basic Controls** - Start, pause, resume, stop
-2. **Customization** - Quality presets, storage options
-3. **Wave Visualization** - Real-time waveform display
-4. **Complete App** - Production-ready example
+Check out the `/example` folder for complete production-ready examples:
 
 Run examples:
 ```bash
@@ -534,9 +635,8 @@ Built with these amazing packages:
 
 ## 📞 Support
 
-- 📧 **Issues**: [GitHub Issues](https://github.com/yourusername/voice_recorder/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/yourusername/voice_recorder/discussions)
-- 📖 **Documentation**: [API Docs](https://pub.dev/documentation/voice_recorder/latest/)
+- 📧 **Issues**: [GitHub Issues](https://github.com/prathviksankaliya/voice-recorder/issues)
+- 📖 **Documentation**: [API Docs](https://pub.dev/documentation/voice-recorder/latest/)
 
 ---
 

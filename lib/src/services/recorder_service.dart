@@ -114,7 +114,7 @@ class RecorderService {
 
       // Generate unique filename with timestamp
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      _recordingFileName = '${_config.filePrefix}_$timestamp.${_config.fileExtension}';
+      _recordingFileName = 'recording_$timestamp.m4a';
 
       final fileName = _recordingFileName;
       if (fileName == null) {
@@ -232,38 +232,6 @@ class RecorderService {
     }
   }
 
-  /// Restarts the recording
-  ///
-  /// Stops the current recording (if any) and starts a new one.
-  /// The previous recording file will be deleted.
-  /// 
-  /// Throws [RecorderException] if restart fails.
-  Future<void> restartRecording() async {
-    try {
-      // Delete current recording if exists
-      final filePath = _recordingFileFullPath;
-      if (filePath != null) {
-        await _storageHandler.deleteRecording(filePath);
-      }
-
-      // Stop current recording
-      if (isRecording || isPaused) {
-        await _recorder.stop();
-      }
-
-      // Start new recording
-      await startRecording();
-
-      print('RecorderService: Recording restarted');
-    } catch (e, stackTrace) {
-      print('RecorderService: Restart recording error - $e');
-      if (e is RecorderException) {
-        rethrow;
-      }
-      throw RecorderException.recordingFailed(e);
-    }
-  }
-
   /// Deletes the current recording file
   ///
   /// Stops the recording if active and deletes the file from storage.
@@ -301,6 +269,40 @@ class RecorderService {
     }
   }
 
+  /// Restarts the recording from the beginning
+  ///
+  /// Stops the current recording (if active), deletes the file,
+  /// and starts a new recording with a fresh timestamp.
+  /// Maintains the same configuration (quality, storage settings).
+  ///
+  /// Throws [RecorderException] if restart fails.
+  Future<void> restartRecording() async {
+    try {
+      print('RecorderService: Restarting recording...');
+
+      // Step 1: Stop current recording if active
+      if (isRecording || isPaused) {
+        await stopRecording();
+        print('RecorderService: Stopped current recording');
+      }
+
+      // Step 2: Delete the recording file
+      await deleteRecording();
+      print('RecorderService: Deleted old recording file');
+
+      // Step 3: Start new recording with fresh timestamp
+      await startRecording();
+
+      print('RecorderService: Recording restarted successfully - $_recordingFileName');
+    } catch (e, stackTrace) {
+      print('RecorderService: Restart recording error - $e\n$stackTrace');
+      
+      if (e is RecorderException) {
+        rethrow;
+      }
+      throw RecorderException.recordingFailed(e);
+    }
+  }
 
   /// Disposes the recorder and cleans up resources
   ///
