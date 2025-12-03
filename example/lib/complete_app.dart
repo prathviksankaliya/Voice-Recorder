@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:voice_recorder/voice_recorder.dart';
 
-/// Example 4: Complete App
+/// Example 4: Complete App (Optimized with ValueNotifier)
 ///
 /// This example demonstrates ALL features of the VoiceRecorder package:
 /// - Recording controls (start, stop, pause, resume, restart, delete)
-/// - Real-time wave visualization
+/// - Real-time wave visualization (optimized with isolated widget)
 /// - Duration tracking with HH:MM:SS format
 /// - Amplitude monitoring
 /// - Error handling
@@ -13,6 +13,12 @@ import 'package:voice_recorder/voice_recorder.dart';
 /// - Background recording support
 /// - Recording history
 /// - Customization options
+///
+/// Performance Optimizations:
+/// - ValueNotifier for efficient state management
+/// - Isolated wave widget to prevent unnecessary rebuilds
+/// - RepaintBoundary for wave visualization
+/// - ValueListenableBuilder to minimize widget rebuilds
 class CompleteApp extends StatefulWidget {
   const CompleteApp({super.key});
 
@@ -22,66 +28,63 @@ class CompleteApp extends StatefulWidget {
 
 class _CompleteAppState extends State<CompleteApp> {
   late VoiceRecorder _recorder;
-  RecordingState _state = RecordingState.idle;
-  Duration _duration = Duration.zero;
-  String? _fileName;
-  String? _filePath;
-  String? _errorMessage;
-  double _currentAmplitude = 0.0;
-  int _fileSize = 0;
   
-  // Interruption tracking
-  final List<InterruptionData> _interruptionLog = [];
-  InterruptionData? _currentInterruption;
-  
+  // ValueNotifiers for efficient state management
+  final ValueNotifier<RecordingState> _stateNotifier = 
+      ValueNotifier(RecordingState.idle);
+  final ValueNotifier<Duration> _durationNotifier = 
+      ValueNotifier(Duration.zero);
+  final ValueNotifier<String?> _fileNameNotifier = ValueNotifier(null);
+  final ValueNotifier<String?> _filePathNotifier = ValueNotifier(null);
+  final ValueNotifier<String?> _errorMessageNotifier = ValueNotifier(null);
+  final ValueNotifier<InterruptionData?> _currentInterruptionNotifier = 
+      ValueNotifier(null);
+  final ValueNotifier<List<InterruptionData>> _interruptionLogNotifier = 
+      ValueNotifier([]);
+
   // Recording history
   final List<Recording> _recordingHistory = [];
-  
-  // Settings
-  bool _backgroundRecordingEnabled = true;
-  bool _showAdvancedSettings = false;
 
   @override
   void initState() {
     super.initState();
     _recorder = VoiceRecorder(
       onStateChanged: (state) {
-        setState(() {
-          _state = state;
-          _fileName = _recorder.currentRecordingFileName;
-          _filePath = _recorder.currentRecordingFullPath;
-        });
+        _stateNotifier.value = state;
+        _fileNameNotifier.value = _recorder.currentRecordingFileName;
+        _filePathNotifier.value = _recorder.currentRecordingFullPath;
       },
       onError: (error) {
-        setState(() => _errorMessage = error.message);
+        _errorMessageNotifier.value = error.message;
         _showErrorDialog(error.message);
       },
       onInterruption: (interruption) {
-        setState(() {
-          _currentInterruption = interruption;
-          _interruptionLog.add(interruption);
-        });
+        _currentInterruptionNotifier.value = interruption;
+        _interruptionLogNotifier.value = [
+          ..._interruptionLogNotifier.value,
+          interruption
+        ];
         _showInterruptionSnackBar(interruption);
       },
     );
 
     _recorder.initialize();
 
-    // Listen to duration updates
+    // Listen to duration updates without setState
     _recorder.durationStream.listen((duration) {
-      setState(() => _duration = duration);
-    });
-
-    // Listen to amplitude updates for visualization
-    _recorder.amplitudeStream.listen((amplitude) {
-      setState(() {
-        _currentAmplitude = amplitude.current;
-      });
+      _durationNotifier.value = duration;
     });
   }
 
   @override
   void dispose() {
+    _stateNotifier.dispose();
+    _durationNotifier.dispose();
+    _fileNameNotifier.dispose();
+    _filePathNotifier.dispose();
+    _errorMessageNotifier.dispose();
+    _currentInterruptionNotifier.dispose();
+    _interruptionLogNotifier.dispose();
     _recorder.dispose();
     super.dispose();
   }
@@ -133,7 +136,9 @@ class _CompleteAppState extends State<CompleteApp> {
             ),
           ],
         ),
-        backgroundColor: interruption.isInterrupted ? Colors.orange : Colors.green,
+        backgroundColor: interruption.isInterrupted
+            ? Colors.orange
+            : Colors.green,
         duration: const Duration(seconds: 3),
       ),
     );
@@ -145,13 +150,6 @@ class _CompleteAppState extends State<CompleteApp> {
       appBar: AppBar(
         title: const Text('Complete App - All Features'),
         actions: [
-          // Settings button
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              setState(() => _showAdvancedSettings = !_showAdvancedSettings);
-            },
-          ),
           // Info button
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -163,11 +161,24 @@ class _CompleteAppState extends State<CompleteApp> {
         child: Column(
           children: [
             // Error banner
-            if (_errorMessage != null) _buildErrorBanner(),
+            ValueListenableBuilder<String?>(
+              valueListenable: _errorMessageNotifier,
+              builder: (context, errorMessage, child) {
+                if (errorMessage == null) return const SizedBox.shrink();
+                return _buildErrorBanner(errorMessage);
+              },
+            ),
 
             // Current interruption alert
-            if (_currentInterruption?.isInterrupted == true)
-              _buildInterruptionAlert(),
+            ValueListenableBuilder<InterruptionData?>(
+              valueListenable: _currentInterruptionNotifier,
+              builder: (context, interruption, child) {
+                if (interruption?.isInterrupted != true) {
+                  return const SizedBox.shrink();
+                }
+                return _buildInterruptionAlert(interruption!);
+              },
+            ),
 
             const SizedBox(height: 16),
 
@@ -176,26 +187,27 @@ class _CompleteAppState extends State<CompleteApp> {
 
             const SizedBox(height: 20),
 
-            // Wave visualization with fixed stream handling
-            _buildWaveVisualization(),
+            // Wave visualization - isolated with RepaintBoundary
+            RepaintBoundary(
+              child: _IsolatedWaveWidget(
+                recorder: _recorder,
+                stateNotifier: _stateNotifier,
+              ),
+            ),
 
             const SizedBox(height: 24),
 
             // Duration display (HH:MM:SS format)
-            if (_state == RecordingState.recording ||
-                _state == RecordingState.paused)
-              _buildDurationDisplay(),
-
-            const SizedBox(height: 16),
-
-            // Amplitude meter
-            if (_state == RecordingState.recording)
-              _buildAmplitudeMeter(),
-
-            const SizedBox(height: 16),
-
-            // Advanced settings panel
-            if (_showAdvancedSettings) _buildAdvancedSettings(),
+            ValueListenableBuilder<RecordingState>(
+              valueListenable: _stateNotifier,
+              builder: (context, state, child) {
+                if (state != RecordingState.recording &&
+                    state != RecordingState.paused) {
+                  return const SizedBox.shrink();
+                }
+                return _buildDurationDisplay();
+              },
+            ),
 
             const SizedBox(height: 16),
 
@@ -205,10 +217,13 @@ class _CompleteAppState extends State<CompleteApp> {
             const SizedBox(height: 16),
 
             // Interruption log
-            if (_interruptionLog.isNotEmpty) _buildInterruptionLog(),
-
-            // Recording history
-            if (_recordingHistory.isNotEmpty) _buildRecordingHistory(),
+            ValueListenableBuilder<List<InterruptionData>>(
+              valueListenable: _interruptionLogNotifier,
+              builder: (context, log, child) {
+                if (log.isEmpty) return const SizedBox.shrink();
+                return _buildInterruptionLog(log);
+              },
+            ),
 
             const SizedBox(height: 20),
           ],
@@ -218,7 +233,7 @@ class _CompleteAppState extends State<CompleteApp> {
   }
 
   /// Error banner widget
-  Widget _buildErrorBanner() {
+  Widget _buildErrorBanner(String errorMessage) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -229,13 +244,16 @@ class _CompleteAppState extends State<CompleteApp> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              _errorMessage!,
-              style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+              errorMessage,
+              style: const TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           IconButton(
             icon: const Icon(Icons.close, size: 20, color: Colors.red),
-            onPressed: () => setState(() => _errorMessage = null),
+            onPressed: () => _errorMessageNotifier.value = null,
           ),
         ],
       ),
@@ -243,7 +261,7 @@ class _CompleteAppState extends State<CompleteApp> {
   }
 
   /// Current interruption alert
-  Widget _buildInterruptionAlert() {
+  Widget _buildInterruptionAlert(InterruptionData interruption) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -257,18 +275,15 @@ class _CompleteAppState extends State<CompleteApp> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Recording Interrupted: ${_currentInterruption!.type.name}',
+                  'Recording Interrupted: ${interruption.type.name}',
                   style: const TextStyle(
                     color: Colors.orange,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  'Time: ${_formatDuration(DateTime.now().difference(_currentInterruption!.timestamp))}',
-                  style: TextStyle(
-                    color: Colors.orange.shade700,
-                    fontSize: 12,
-                  ),
+                  'Time: ${_formatDuration(DateTime.now().difference(interruption.timestamp))}',
+                  style: TextStyle(color: Colors.orange.shade700, fontSize: 12),
                 ),
               ],
             ),
@@ -280,97 +295,115 @@ class _CompleteAppState extends State<CompleteApp> {
 
   /// Status dashboard card
   Widget _buildStatusDashboard() {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // State indicator
-            Row(
+    return ValueListenableBuilder<RecordingState>(
+      valueListenable: _stateNotifier,
+      builder: (context, state, child) {
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'State: ',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _getStateColor().withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _getStateColor(), width: 2),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(_getStateIcon(), size: 16, color: _getStateColor()),
-                      const SizedBox(width: 4),
-                      Text(
-                        _state.name.toUpperCase(),
-                        style: TextStyle(
-                          color: _getStateColor(),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                if (_backgroundRecordingEnabled && _state == RecordingState.recording)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade100,
-                      borderRadius: BorderRadius.circular(8),
+                // State indicator
+                Row(
+                  children: [
+                    const Text(
+                      'State: ',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.cloud_queue, size: 14, color: Colors.blue.shade700),
-                        const SizedBox(width: 4),
-                        Text(
-                          'BG',
-                          style: TextStyle(
-                            color: Colors.blue.shade700,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getStateColor(state).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _getStateColor(state), width: 2),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(_getStateIcon(state), size: 16, color: _getStateColor(state)),
+                          const SizedBox(width: 4),
+                          Text(
+                            state.name.toUpperCase(),
+                            style: TextStyle(
+                              color: _getStateColor(state),
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                ValueListenableBuilder<String?>(
+                  valueListenable: _fileNameNotifier,
+                  builder: (context, fileName, child) {
+                    if (fileName == null) return const SizedBox.shrink();
+                    return Column(
+                      children: [
+                        const Divider(height: 24),
+                        _buildInfoRow(Icons.insert_drive_file, 'File', fileName),
+                      ],
+                    );
+                  },
+                ),
+
+                ValueListenableBuilder<String?>(
+                  valueListenable: _filePathNotifier,
+                  builder: (context, filePath, child) {
+                    if (filePath == null) return const SizedBox.shrink();
+                    return Column(
+                      children: [
+                        const SizedBox(height: 8),
+                        _buildInfoRow(
+                          Icons.folder_open,
+                          'Path',
+                          filePath,
+                          isPath: true,
                         ),
                       ],
-                    ),
+                    );
+                  },
+                ),
+
+                if (state != RecordingState.idle)
+                  ValueListenableBuilder<Duration>(
+                    valueListenable: _durationNotifier,
+                    builder: (context, duration, child) {
+                      return Column(
+                        children: [
+                          const SizedBox(height: 8),
+                          _buildInfoRow(
+                            Icons.timer,
+                            'Duration',
+                            _formatDuration(duration),
+                          ),
+                        ],
+                      );
+                    },
                   ),
               ],
             ),
-            
-            if (_fileName != null) ...[
-              const Divider(height: 24),
-              _buildInfoRow(Icons.insert_drive_file, 'File', _fileName!),
-            ],
-            
-            if (_filePath != null) ...[
-              const SizedBox(height: 8),
-              _buildInfoRow(Icons.folder_open, 'Path', _filePath!, isPath: true),
-            ],
-            
-            if (_state != RecordingState.idle) ...[
-              const SizedBox(height: 8),
-              _buildInfoRow(
-                Icons.timer,
-                'Duration',
-                _formatDuration(_duration),
-              ),
-            ],
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
   /// Info row helper
-  Widget _buildInfoRow(IconData icon, String label, String value, {bool isPath = false}) {
+  Widget _buildInfoRow(
+    IconData icon,
+    String label,
+    String value, {
+    bool isPath = false,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -392,261 +425,135 @@ class _CompleteAppState extends State<CompleteApp> {
     );
   }
 
-  /// Wave visualization with proper stream handling
-  Widget _buildWaveVisualization() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: AudioWaveWidget(
-        // Fixed: Properly handle the amplitude stream
-        amplitudeStream: _recorder.amplitudeStream.map((amp) => amp.current),
-        recordingState: _state,
-        config: WaveConfig(
-          height: 120.0,
-          barWidth: 5.0,
-          barSpacing: 4.0,
-          barCount: 50,
-          minBarHeight: 8.0,
-          waveColor: _getStateColor(),
-          inactiveColor: Colors.grey.shade300,
-          style: WaveStyle.rounded,
-          barBorderRadius: BorderRadius.circular(4.0),
-          alignment: WaveAlignment.center,
-          animationDuration: const Duration(milliseconds: 150),
-          animationCurve: Curves.easeInOut,
-        ),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              _getStateColor().withOpacity(0.1),
-              _getStateColor().withOpacity(0.05),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _getStateColor().withOpacity(0.3), width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: _getStateColor().withOpacity(0.2),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.all(20),
-      ),
-    );
-  }
-
   /// Duration display with HH:MM:SS format
   Widget _buildDurationDisplay() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      decoration: BoxDecoration(
-        color: _getStateColor().withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _getStateColor().withOpacity(0.3), width: 2),
-      ),
-      child: Column(
-        children: [
-          Text(
-            _formatDuration(_duration),
-            style: TextStyle(
-              fontSize: 56,
-              fontWeight: FontWeight.bold,
-              color: _getStateColor(),
-              fontFeatures: const [FontFeature.tabularFigures()],
-              letterSpacing: 4,
-            ),
-          ),
-          Text(
-            _state == RecordingState.paused ? 'PAUSED' : 'RECORDING',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: _getStateColor(),
-              letterSpacing: 2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Amplitude meter
-  Widget _buildAmplitudeMeter() {
-    final normalizedAmplitude = (_currentAmplitude + 160) / 160; // Normalize -160 to 0 dB
-    final clampedAmplitude = normalizedAmplitude.clamp(0.0, 1.0);
-    
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+    return ValueListenableBuilder<RecordingState>(
+      valueListenable: _stateNotifier,
+      builder: (context, state, child) {
+        return ValueListenableBuilder<Duration>(
+          valueListenable: _durationNotifier,
+          builder: (context, duration, child) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: _getStateColor(state).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _getStateColor(state).withOpacity(0.3),
+                  width: 2,
+                ),
+              ),
+              child: Column(
                 children: [
-                  const Icon(Icons.graphic_eq, size: 20),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Audio Level',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const Spacer(),
                   Text(
-                    '${_currentAmplitude.toStringAsFixed(1)} dB',
+                    _formatDuration(duration),
                     style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 56,
+                      fontWeight: FontWeight.bold,
+                      color: _getStateColor(state),
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      letterSpacing: 4,
+                    ),
+                  ),
+                  Text(
+                    state == RecordingState.paused ? 'PAUSED' : 'RECORDING',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: _getStateColor(state),
+                      letterSpacing: 2,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(
-                  value: clampedAmplitude,
-                  minHeight: 12,
-                  backgroundColor: Colors.grey.shade200,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    clampedAmplitude > 0.8
-                        ? Colors.red
-                        : clampedAmplitude > 0.5
-                            ? Colors.orange
-                            : Colors.green,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Advanced settings panel
-  Widget _buildAdvancedSettings() {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.tune, size: 20),
-                SizedBox(width: 8),
-                Text(
-                  'Advanced Settings',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-              ],
-            ),
-            const Divider(height: 24),
-            SwitchListTile(
-              title: const Text('Background Recording'),
-              subtitle: const Text('Continue recording when app is in background'),
-              value: _backgroundRecordingEnabled,
-              onChanged: (value) {
-                setState(() => _backgroundRecordingEnabled = value);
-              },
-              secondary: const Icon(Icons.cloud_queue),
-            ),
-            const SizedBox(height: 8),
-            ListTile(
-              leading: const Icon(Icons.high_quality),
-              title: const Text('Audio Quality'),
-              subtitle: const Text('Voice optimized (default)'),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () {
-                // Show quality selector dialog
-                _showQualityDialog();
-              },
-            ),
-          ],
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 
   /// Control buttons section
   Widget _buildControlButtons() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
+    return ValueListenableBuilder<RecordingState>(
+      valueListenable: _stateNotifier,
+      builder: (context, state, child) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, -2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        alignment: WrapAlignment.center,
-        children: [
-          // Start button
-          if (_state == RecordingState.idle)
-            _buildControlButton(
-              icon: Icons.fiber_manual_record,
-              label: 'Start',
-              color: Colors.red,
-              onPressed: () => _startRecording(),
-            ),
-          
-          // Pause button
-          if (_state == RecordingState.recording)
-            _buildControlButton(
-              icon: Icons.pause,
-              label: 'Pause',
-              color: Colors.orange,
-              onPressed: () => _recorder.pause(),
-            ),
-          
-          // Resume button
-          if (_state == RecordingState.paused)
-            _buildControlButton(
-              icon: Icons.play_arrow,
-              label: 'Resume',
-              color: Colors.green,
-              onPressed: () => _recorder.resume(),
-            ),
-          
-          // Stop button
-          if (_state == RecordingState.recording || _state == RecordingState.paused)
-            _buildControlButton(
-              icon: Icons.stop,
-              label: 'Stop',
-              color: Colors.green,
-              onPressed: () => _stopRecording(),
-            ),
-          
-          // Restart button
-          if (_state == RecordingState.recording || _state == RecordingState.paused)
-            _buildControlButton(
-              icon: Icons.refresh,
-              label: 'Restart',
-              color: Colors.blue,
-              onPressed: () => _restartRecording(),
-            ),
-          
-          // Delete button
-          if (_state != RecordingState.idle)
-            _buildControlButton(
-              icon: Icons.delete,
-              label: 'Delete',
-              color: Colors.grey,
-              onPressed: () => _deleteRecording(),
-            ),
-        ],
-      ),
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: WrapAlignment.center,
+            children: [
+              // Start button
+              if (state == RecordingState.idle)
+                _buildControlButton(
+                  icon: Icons.fiber_manual_record,
+                  label: 'Start',
+                  color: Colors.red,
+                  onPressed: () => _startRecording(),
+                ),
+
+              // Pause button
+              if (state == RecordingState.recording)
+                _buildControlButton(
+                  icon: Icons.pause,
+                  label: 'Pause',
+                  color: Colors.orange,
+                  onPressed: () => _recorder.pause(),
+                ),
+
+              // Resume button
+              if (state == RecordingState.paused)
+                _buildControlButton(
+                  icon: Icons.play_arrow,
+                  label: 'Resume',
+                  color: Colors.green,
+                  onPressed: () => _recorder.resume(),
+                ),
+
+              // Stop button
+              if (state == RecordingState.recording ||
+                  state == RecordingState.paused)
+                _buildControlButton(
+                  icon: Icons.stop,
+                  label: 'Stop',
+                  color: Colors.green,
+                  onPressed: () => _stopRecording(),
+                ),
+
+              // Restart button
+              if (state == RecordingState.recording ||
+                  state == RecordingState.paused)
+                _buildControlButton(
+                  icon: Icons.refresh,
+                  label: 'Restart',
+                  color: Colors.blue,
+                  onPressed: () => _restartRecording(),
+                ),
+
+              // Delete button
+              if (state != RecordingState.idle)
+                _buildControlButton(
+                  icon: Icons.delete,
+                  label: 'Delete',
+                  color: Colors.grey,
+                  onPressed: () => _deleteRecording(),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -672,7 +579,7 @@ class _CompleteAppState extends State<CompleteApp> {
   }
 
   /// Interruption log
-  Widget _buildInterruptionLog() {
+  Widget _buildInterruptionLog(List<InterruptionData> log) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Padding(
@@ -690,18 +597,22 @@ class _CompleteAppState extends State<CompleteApp> {
                 ),
                 const Spacer(),
                 TextButton(
-                  onPressed: () => setState(() => _interruptionLog.clear()),
+                  onPressed: () => _interruptionLogNotifier.value = [],
                   child: const Text('Clear'),
                 ),
               ],
             ),
             const Divider(height: 16),
-            ..._interruptionLog.reversed.take(5).map((interruption) {
+            ...log.reversed.take(5).map((interruption) {
               return ListTile(
                 dense: true,
                 leading: Icon(
-                  interruption.isInterrupted ? Icons.warning_amber : Icons.check_circle,
-                  color: interruption.isInterrupted ? Colors.orange : Colors.green,
+                  interruption.isInterrupted
+                      ? Icons.warning_amber
+                      : Icons.check_circle,
+                  color: interruption.isInterrupted
+                      ? Colors.orange
+                      : Colors.green,
                   size: 20,
                 ),
                 title: Text(
@@ -716,59 +627,10 @@ class _CompleteAppState extends State<CompleteApp> {
                   interruption.isInterrupted ? 'Started' : 'Ended',
                   style: TextStyle(
                     fontSize: 12,
-                    color: interruption.isInterrupted ? Colors.orange : Colors.green,
+                    color: interruption.isInterrupted
+                        ? Colors.orange
+                        : Colors.green,
                   ),
-                ),
-              );
-            }).toList(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Recording history
-  Widget _buildRecordingHistory() {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.library_music, size: 20),
-                const SizedBox(width: 8),
-                const Text(
-                  'Recording History',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const Spacer(),
-                Text(
-                  '${_recordingHistory.length} recordings',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                ),
-              ],
-            ),
-            const Divider(height: 16),
-            ..._recordingHistory.reversed.take(5).map((recording) {
-              return ListTile(
-                dense: true,
-                leading: const Icon(Icons.audiotrack, color: Colors.blue),
-                title: Text(
-                  recording.path.split('/').last,
-                  style: const TextStyle(fontSize: 14),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(
-                  'Duration: ${_formatDuration(recording.duration)} • '
-                  'Size: ${(recording.sizeInBytes / 1024).toStringAsFixed(1)} KB',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                trailing: Text(
-                  '${recording.timestamp.hour}:${recording.timestamp.minute.toString().padLeft(2, '0')}',
-                  style: const TextStyle(fontSize: 12),
                 ),
               );
             }).toList(),
@@ -784,13 +646,10 @@ class _CompleteAppState extends State<CompleteApp> {
       await _recorder.start(
         config: RecorderConfig(
           androidConfig: AndroidRecorderConfig(
-            serviceConfig: _backgroundRecordingEnabled
-                ? AndroidServiceConfig(
-                    title: "Audio Recorder",
-                    content: "Recording in progress...",
-                    icon: "ic_launcher",
-                  )
-                : null,
+            serviceConfig: AndroidServiceConfig(
+              title: "Audio Recorder",
+              content: "Recording in progress...",
+            ),
           ),
         ),
         storageConfig: StorageConfig.visible(),
@@ -807,7 +666,7 @@ class _CompleteAppState extends State<CompleteApp> {
       setState(() {
         _recordingHistory.add(recording);
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -929,7 +788,7 @@ class _CompleteAppState extends State<CompleteApp> {
                 'Try interrupting the recording by:\n'
                 '• Receiving a phone call\n'
                 '• Disconnecting headphones\n'
-                '• Switching to another app',
+                '• Play audio into another app',
                 style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
               ),
             ],
@@ -945,42 +804,9 @@ class _CompleteAppState extends State<CompleteApp> {
     );
   }
 
-  /// Show quality selector dialog
-  void _showQualityDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Audio Quality'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('Voice (Default)'),
-              subtitle: const Text('Optimized for voice recording'),
-              leading: const Icon(Icons.mic),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              title: const Text('High Quality'),
-              subtitle: const Text('Better quality, larger file size'),
-              leading: const Icon(Icons.high_quality),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              title: const Text('Custom'),
-              subtitle: const Text('Configure manually'),
-              leading: const Icon(Icons.tune),
-              onTap: () => Navigator.pop(context),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   /// Get state color
-  Color _getStateColor() {
-    switch (_state) {
+  Color _getStateColor(RecordingState state) {
+    switch (state) {
       case RecordingState.recording:
         return Colors.red;
       case RecordingState.paused:
@@ -993,8 +819,8 @@ class _CompleteAppState extends State<CompleteApp> {
   }
 
   /// Get state icon
-  IconData _getStateIcon() {
-    switch (_state) {
+  IconData _getStateIcon(RecordingState state) {
+    switch (state) {
       case RecordingState.recording:
         return Icons.fiber_manual_record;
       case RecordingState.paused:
@@ -1004,5 +830,93 @@ class _CompleteAppState extends State<CompleteApp> {
       case RecordingState.idle:
         return Icons.mic_none;
     }
+  }
+}
+
+/// Isolated Wave Widget - prevents rebuilds from parent state changes
+/// 
+/// This widget is isolated to ensure that wave visualization only rebuilds
+/// when the recording state changes, not when other parts of the UI update
+/// (like duration, file info, etc.). This dramatically improves performance.
+class _IsolatedWaveWidget extends StatelessWidget {
+  final VoiceRecorder recorder;
+  final ValueNotifier<RecordingState> stateNotifier;
+
+  const _IsolatedWaveWidget({
+    required this.recorder,
+    required this.stateNotifier,
+  });
+
+  Color _getStateColor(RecordingState state) {
+    switch (state) {
+      case RecordingState.recording:
+        return Colors.red;
+      case RecordingState.paused:
+        return Colors.orange;
+      case RecordingState.stopped:
+        return Colors.green;
+      case RecordingState.idle:
+        return Colors.blue;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<RecordingState>(
+      valueListenable: stateNotifier,
+      builder: (context, state, child) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    _getStateColor(state).withOpacity(0.1),
+                    _getStateColor(state).withOpacity(0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _getStateColor(state).withOpacity(0.3),
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: _getStateColor(state).withOpacity(0.2),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: AudioWaveWidget(
+                  amplitudeStream: recorder.amplitudeStream.map((amp) => amp.current),
+                  recordingState: state,
+                  config: WaveConfig(
+                    height: 100.0,
+                    barWidth: 4.0,
+                    barSpacing: 3.0,
+                    barCount: 60,
+                    minBarHeight: 6.0,
+                    waveColor: Colors.blue,
+                    inactiveColor: Colors.grey.shade300,
+                    style: WaveStyle.rounded,
+                    barBorderRadius: BorderRadius.circular(4.0),
+                    alignment: WaveAlignment.center,
+                    animationDuration: const Duration(milliseconds: 100),
+                    animationCurve: Curves.easeInOutCubic,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
